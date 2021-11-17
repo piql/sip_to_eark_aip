@@ -43,12 +43,6 @@ def overwrite_and_create_directory(directory):
     Deletes directory if it exists and (re)creates directory
     :param Path directory: path that needs to be (re)created
     """
-    """
-    if os.path.isdir(directory):
-        print("Overwriting '%s'" % directory)
-        shutil.rmtree(directory)
-    os.makedirs(directory)
-    """
     if directory.is_dir():
         print("Overwriting '%s'" % directory)
         shutil.rmtree(directory)
@@ -66,7 +60,6 @@ def validate_representations_sequence(representations_path):
     :param Path representations_path:
     :return Boolean:
     """
-    # check sequence
     expected_sequence_number = 1
     previous_folder_name = '///'
 
@@ -161,8 +154,6 @@ def update_sip_representations(aip_path):
             # else:
             #     print("%s METS.xml missing." % rep)
 
-        # TODO: change rep name in METS.xml to rep0x
-
 
 def transform(sip_path, aip_path):
     aip_name = sip_path.stem
@@ -185,7 +176,6 @@ def transform(sip_path, aip_path):
 
 def create_mets(path):
     """
-
     :param Path path:
     :return:
     """
