@@ -4,11 +4,10 @@ import os
 import shutil
 import sys
 import uuid
+import metsrw
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
-
-import metsrw
 
 
 # logs_file_path = "./app.log"
@@ -22,6 +21,14 @@ def get_arg(index):
         return None
     else:
         return sys.argv[index]
+
+
+def get_checksum(file):
+    sha256_hash = hashlib.sha256()
+    with open(file, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
 
 
 def validate_directories(sip_dir, output_dir):
@@ -52,6 +59,7 @@ def overwrite_and_create_directory(directory):
     """
     Deletes directory if it exists and (re)creates directory
     :param Path directory: path that needs to be (re)created
+    :return Boolean: if successful
     """
     if directory.is_dir():
         print("Overwriting '%s'" % directory)
@@ -61,17 +69,16 @@ def overwrite_and_create_directory(directory):
     except FileExistsError as e:
         print(e)
         print('Error with AIP overwrite')
-        sys.exit(1)
 
 
 def validate_representations_sequence(representations_path):
     """
-
-    :param Path representations_path:
-    :return Boolean:
+    Validate SIP representations naming and sequence structure
+    :param Path representations_path: path to SIP representations folder to be vaildated
+    :return Boolean: True if valid
     """
     expected_sequence_number = 1
-    previous_folder_name = '///'
+    previous_folder_name = ''
 
     for rep in sorted(representations_path.iterdir()):
         rep = str(rep.stem)
@@ -82,17 +89,17 @@ def validate_representations_sequence(representations_path):
             print("ERROR in SIP representation. No sequence number.")
             return False
 
-        if previous_folder_name == '///':
+        if expected_sequence_number == 1:
             previous_folder_name = folder_name
         elif folder_name != previous_folder_name:
             print("ERROR in SIP representations naming sequence. Expected:", previous_folder_name, "Got:", folder_name)
             return False
 
-        if expected_sequence_number != sequence_number:
+        if expected_sequence_number == sequence_number:
+            expected_sequence_number += 1
+        else:
             print("ERROR in SIP rep number sequence. Expected:", expected_sequence_number, "Got:", sequence_number)
             return False
-        else:
-            expected_sequence_number += 1
     return True
 
 
@@ -102,19 +109,17 @@ def new_uuid():
 
 def update_all_mets_ids(mets_tree, id_updates, namespaces):
     """
-    :param ElementTree mets_tree:
-    :param dict id_updates:
-    :param dict namespaces:
-    :return:
+    Updates all IDS in a mets file
+    :param ElementTree mets_tree: tree for IDs to be updated on
+    :param dict id_updates: contains tracked changes in ID's to maintain connections
+    :param dict namespaces: contains namespaces ad their schema locations
     """
     root = mets_tree.getroot()
-
     try:
         if root.attrib['OBJID'] in id_updates:
             root.attrib['OBJID'] = id_updates[root.attrib['OBJID']]
         else:
             print("Warning: AIP uuid not updated")
-            root.attrib['OBJID'] = new_uuid()
     except ValueError:
         print("Warning: No OBJID in SIP METS.xml")
 
@@ -133,9 +138,6 @@ def update_all_mets_ids(mets_tree, id_updates, namespaces):
     filesec_element = root.find('{%s}fileSec' % namespaces[''])
     filesec_element.attrib['ID'] = new_uuid()
     for filegrp in filesec_element.findall('{%s}fileGrp' % namespaces['']):
-        filegrp_id = new_uuid()
-        id_updates[filegrp.attrib['ID']] = filegrp_id
-        filegrp.attrib['ID'] = filegrp_id
         for sub_filegrp in filegrp.findall('{%s}fileGrp' % namespaces['']):
             sub_filegrp_id = new_uuid()
             id_updates[sub_filegrp.attrib['ID']] = sub_filegrp_id
@@ -145,6 +147,9 @@ def update_all_mets_ids(mets_tree, id_updates, namespaces):
                 id_updates[file_element.attrib['ID']] = file_id
                 file_element.attrib['ID'] = file_id
         else:
+            filegrp_id = new_uuid()
+            id_updates[filegrp.attrib['ID']] = filegrp_id
+            filegrp.attrib['ID'] = filegrp_id
             for file_element in filegrp.findall('{%s}file' % namespaces['']):
                 file_id = new_uuid()
                 id_updates[file_element.attrib['ID']] = file_id
@@ -184,24 +189,30 @@ def update_all_mets_ids(mets_tree, id_updates, namespaces):
                     print('Warning: Got unsupported pointer:', item.attrib['LABEL'], item.tag, "while updating mets ID")
         else:
             for item in div:
-                item_to_use = item
-                if str(item.tag) == '{%s}div' % namespaces['']:
-                    for sub_item in item:
-                        item_to_use = sub_item
+                if str(item.tag) == '{%s}fptr' % namespaces['']:
+                    if item.attrib['FILEID'] in id_updates:
+                        item.attrib['FILEID'] = id_updates[item.attrib['FILEID']]
+                elif str(item.tag) == '{%s}mptr' % namespaces['']:
+                    try:
+                        if item.attrib['{%s}title' % namespaces['xlink']] in id_updates:
+                            item.attrib['{%s}title' % namespaces['xlink']] = id_updates[
+                                item.attrib['{%s}title' % namespaces['xlink']]]
+                    except KeyError:
+                        pass
                 else:
-                    if str(item_to_use.tag) == '{%s}fptr' % namespaces['']:
-                        if item_to_use.attrib['FILEID'] in id_updates:
-                            item.attrib['FILEID'] = id_updates[item.attrib['FILEID']]
-                    elif str(item_to_use.tag) == '{%s}mptr' % namespaces['']:
-                        if item_to_use.attrib['{%s}title' % namespaces['xlink']] in id_updates:
-                            item_to_use.attrib['{%s}title' % namespaces['xlink']] = id_updates[
-                                item_to_use.attrib['{%s}title' % namespaces['xlink']]]
-                    else:
-                        print('Got unsupported pointer:', item.tag, "while updating mets ID")
+                    print('Warning: Got unsupported pointer:', item.attrib['LABEL'], item.tag, "while updating mets ID")
 
 
 def create_root_aip_mets(sip_mets, aip_root, id_updates):
-
+    """
+    The structure of the SIP and AIP are similar so it is possible to alter the SIP METS.xml to
+    This method maintains namespaces with the original SIP mets and uses it as a template. The necessary adjustments are
+    made to make it a conformant EARK AIP mets file.
+    :param Path sip_mets: Path to SIP METS to use as template
+    :param Path aip_root: Path to AIP root where METS will be written
+    :param dict id_updates: Tracks ID changed to ensure connections remain
+    :return:
+    """
     # register namespaces to ET parser
     namespaces = {}
     for key, value in ET.iterparse(sip_mets, events=['start-ns']):
@@ -212,13 +223,17 @@ def create_root_aip_mets(sip_mets, aip_root, id_updates):
     root = tree.getroot()
     created_now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f%z")
 
+    # METS HEADER
     metshdr_elemet = root.find('{%s}metsHdr' % namespaces[''])
     metshdr_elemet.attrib['LASTMODDATE'] = created_now
     metshdr_elemet.attrib['RECORDSTATUS'] = 'Revised'
     try:
         metshdr_elemet.attrib['{%s}OAISPACKAGETYPE' % namespaces['csip']] = 'AIP'
     except KeyError:
-        print("metsHdr doesn't containt OAISPACKAGETYPE")
+        print("Warning: metsHdr doesn't containt OAISPACKAGETYPE")
+
+    # FILE SECTION
+    filesec_element = root.find('{%s}fileSec' % namespaces[''])
 
     new_filegrp = ET.Element('{%s}fileGrp' % namespaces[''])
     new_filegrp.attrib['ID'] = new_uuid()
@@ -239,12 +254,10 @@ def create_root_aip_mets(sip_mets, aip_root, id_updates):
 
     new_file.append(new_flocat)
     new_filegrp.append(new_file)
-    filesec_element = root.find('{%s}fileSec' % namespaces[''])
     filesec_element.append(new_filegrp)
 
-    # Adjust representations filegroup
+    # EACH FILE GROUP
     for fileGrp in filesec_element.findall('{%s}fileGrp' % namespaces['']):
-        # if any(map(fileGrp.attrib['USE'].startswith, ('Representations', 'representations'))):
         if fileGrp.attrib['USE'].lower().startswith('representations'):
             rep_parts = Path(fileGrp.attrib['USE']).parts
             rep_name = rep_parts[1].rstrip('0123456789')
@@ -273,6 +286,7 @@ def create_root_aip_mets(sip_mets, aip_root, id_updates):
             else:
                 print('ERROR: Expected Preservation METS.xml')
 
+    # STRUCT MAP
     structmap_element = root.find('{%s}structMap' % namespaces[''])
     root_div_element = structmap_element.find('{%s}div' % namespaces[''])
     root_div_element.attrib['ID'] = new_uuid()
@@ -300,6 +314,7 @@ def create_root_aip_mets(sip_mets, aip_root, id_updates):
                     if str(pointer.tag) == '{%s}mptr' % namespaces['']:
                         pointer.attrib['{%s}href' % namespaces['xlink']] = preservation_rep_path + '/METS.xml'
 
+    # UPDATE IDS
     update_all_mets_ids(tree, id_updates, namespaces)
 
     ET.indent(tree, space='    ', level=0)
@@ -308,7 +323,7 @@ def create_root_aip_mets(sip_mets, aip_root, id_updates):
 
 def copy_sip_to_aip(sip_path, aip_path):
     """
-
+    Copy the required items from the SIP into the necessary locations in the AIP
     :param Path sip_path:
     :param Path aip_path:
     :return:
@@ -326,7 +341,7 @@ def copy_sip_to_aip(sip_path, aip_path):
                 destination_path = aip_submission_path / item
                 if item_path.is_dir():
                     shutil.copytree(item_path, destination_path)
-                    # if True also copy item into root
+                    # if True, also copy item into aip root
                     if items_to_copy[item]:
                         shutil.copytree(item_path, aip_path / item)
                 elif item_path.is_file():
@@ -338,34 +353,28 @@ def copy_sip_to_aip(sip_path, aip_path):
             print("Exiting.")
             sys.exit(1)
     else:
-        print("Error: root representations directory not found")
+        print("Error: SIP representations directory not found")
         print("Exiting.")
         sys.exit(1)
 
 
 def create_aip_representations(aip_path):
     """
-
-    :param Path aip_path:
-    :return:
+    Create preservation directories to store archivematica transfer
+    :param Path aip_path: path to AIP root
     """
-    # update representations and create preservation directories
     aip_submission_representations_path = aip_path / 'submission' / "representations"
 
-    if validate_representations_sequence(aip_submission_representations_path):
-        for rep in sorted(aip_submission_representations_path.iterdir()):
-            rep = rep.stem
-            rep_name = rep.rstrip('0123456789')
-            rep_number = int(rep[len(rep_name):])
+    for rep in sorted(aip_submission_representations_path.iterdir()):
+        rep = rep.stem
+        rep_name = rep.rstrip('0123456789')
+        rep_number = int(rep[len(rep_name):])
 
-            # make preservation directory : rep1 -> rep01.1
-            preservation_rep_path = aip_path / "representations" / "{}{:02}.1".format('rep', rep_number)
-            (preservation_rep_path / "data").mkdir(parents=True)
-            # create preservation rep METS.xml
-            create_mets(preservation_rep_path)
-    else:
-        print("Exiting.")
-        sys.exit(1)
+        # make preservation directory : rep1 -> rep01.1
+        preservation_rep_path = aip_path / "representations" / "{}{:02}.1".format('rep', rep_number)
+        (preservation_rep_path / "data").mkdir(parents=True)
+        # create preservation rep METS.xml
+        create_mets(preservation_rep_path)
 
 
 def transform_sip_to_aip(sip_path, aip_path):
@@ -394,14 +403,12 @@ def transform_sip_to_aip(sip_path, aip_path):
 
     # TODO:
     #  - Transfer archivematica AIP into preservation
-    #  - Create root METS.xml for each preservation representations folder  - Update
-    #  - Create root METS.xml for AIP root                                  - Update
 
 
 def create_mets(path):
     """
-    :param Path path:
-    :return:
+    Creates METS.xml on directory and writes to directory root
+    :param Path path: path to information package to create mets on
     """
     mets = metsrw.METSDocument()
     mets.append(create_fse(path, path))
@@ -409,20 +416,12 @@ def create_mets(path):
     print("METS written in: %s" % path)
 
 
-def get_checksum(file):
-    sha256_hash = hashlib.sha256()
-    with open(file, "rb") as f:
-        for byte_block in iter(lambda: f.read(4096), b""):
-            sha256_hash.update(byte_block)
-        return sha256_hash.hexdigest()
-
-
 def create_fse(current_path, aip_root_path):
     """
     Recursive call for creating metsrw.FSEntry tree to be written to METS
-    :param Path current_path: keeps track of current
-    :param Path aip_root_path:
-    :return FSEntry fse:
+    :param Path current_path: keeps track of current directory
+    :param Path aip_root_path: path to the AIP root
+    :return FSEntry fse: completed tree of directory
     """
     base_directory = current_path.stem
     fse = metsrw.FSEntry(label=base_directory, type="Directory", file_uuid=str(uuid.uuid4()))
