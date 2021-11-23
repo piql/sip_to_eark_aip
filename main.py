@@ -40,6 +40,8 @@ def validate_directories(sip_dir, output_dir):
                     try:
                         sip_uuid = str(sip_name[sip_name.index('uuid-') + len('uuid-'):])
                         uuid_obj = uuid.UUID(sip_uuid, version=4)
+                        if sip_uuid == str(uuid_obj):
+                            pass
                     except ValueError:
                         print("Error: SIP doesn't contain valid uuid4")
                     else:
@@ -125,35 +127,25 @@ def update_all_mets_ids(mets_tree, id_updates, namespaces):
 
     dmdsec_elements = root.findall('{%s}dmdSec' % namespaces[''])
     for dmdsec in dmdsec_elements:
-        new_id = new_uuid()
-        id_updates[dmdsec.attrib['ID']] = new_id
-        dmdsec.attrib['ID'] = new_id
+        id_updates[dmdsec.attrib['ID']] = dmdsec.attrib['ID'] = new_uuid()
 
     amdsec_elements = root.findall('{%s}amdSec' % namespaces[''])
     for amdsec in amdsec_elements:
-        new_id = new_uuid()
-        id_updates[amdsec.attrib['ID']] = new_id
-        amdsec.attrib['ID'] = new_id
+        id_updates[amdsec.attrib['ID']] = amdsec.attrib['ID'] = new_uuid()
 
     filesec_element = root.find('{%s}fileSec' % namespaces[''])
     filesec_element.attrib['ID'] = new_uuid()
     for filegrp in filesec_element.findall('{%s}fileGrp' % namespaces['']):
-        for sub_filegrp in filegrp.findall('{%s}fileGrp' % namespaces['']):
-            sub_filegrp_id = new_uuid()
-            id_updates[sub_filegrp.attrib['ID']] = sub_filegrp_id
-            sub_filegrp.attrib['ID'] = sub_filegrp_id
-            for file_element in sub_filegrp.findall('{%s}file' % namespaces['']):
-                file_id = new_uuid()
-                id_updates[file_element.attrib['ID']] = file_id
-                file_element.attrib['ID'] = file_id
+        filegrp_sub_filegrps = filegrp.findall('{%s}fileGrp' % namespaces[''])
+        if filegrp_sub_filegrps:
+            for sub_filegrp in filegrp.findall('{%s}fileGrp' % namespaces['']):
+                id_updates[sub_filegrp.attrib['ID']] = sub_filegrp.attrib['ID'] = new_uuid()
+                for file_element in sub_filegrp.findall('{%s}file' % namespaces['']):
+                    id_updates[file_element.attrib['ID']] = file_element.attrib['ID'] = new_uuid()
         else:
-            filegrp_id = new_uuid()
-            id_updates[filegrp.attrib['ID']] = filegrp_id
-            filegrp.attrib['ID'] = filegrp_id
+            id_updates[filegrp.attrib['ID']] = filegrp.attrib['ID'] = new_uuid()
             for file_element in filegrp.findall('{%s}file' % namespaces['']):
-                file_id = new_uuid()
-                id_updates[file_element.attrib['ID']] = file_id
-                file_element.attrib['ID'] = file_id
+                id_updates[file_element.attrib['ID']] = file_element.attrib['ID'] = new_uuid()
 
     structmap_element = root.find('{%s}structMap' % namespaces[''])
     structmap_element.attrib['ID'] = new_uuid()
@@ -169,41 +161,142 @@ def update_all_mets_ids(mets_tree, id_updates, namespaces):
                     div.attrib['DMDID'] = new_uuid()
             except KeyError:
                 print("Warning: Expecting 'DMDID' in structmap metadata")
-
-        for sub_div in div.findall('{%s}div' % namespaces['']):
-            sub_div_id = new_uuid()
-            # id_updates[sub_div.attrib['ID']] = sub_div_id
-            sub_div.attrib['ID'] = sub_div_id
-            for item in sub_div:
-                if str(item.tag) == '{%s}fptr' % namespaces['']:
-                    if item.attrib['FILEID'] in id_updates:
-                        item.attrib['FILEID'] = id_updates[item.attrib['FILEID']]
-                elif str(item.tag) == '{%s}mptr' % namespaces['']:
-                    try:
-                        if item.attrib['{%s}title' % namespaces['xlink']] in id_updates:
-                            item.attrib['{%s}title' % namespaces['xlink']] = id_updates[
-                                item.attrib['{%s}title' % namespaces['xlink']]]
-                    except KeyError:
-                        pass
-                else:
-                    print('Warning: Got unsupported pointer:', item.attrib['LABEL'], item.tag, "while updating mets ID")
+        div_subdivs = div.findall('{%s}div' % namespaces[''])
+        if div_subdivs:
+            for sub_div in div_subdivs:
+                sub_div_id = new_uuid()
+                # id_updates[sub_div.attrib['ID']] = sub_div_id
+                sub_div.attrib['ID'] = sub_div_id
+                for item in sub_div:
+                    if str(item.tag) == '{%s}fptr' % namespaces['']:
+                        if item.attrib['FILEID'] in id_updates:
+                            item.attrib['FILEID'] = id_updates[item.attrib['FILEID']]
+                        else:
+                            item.attrib['FILEID'] = new_uuid()
+                    elif str(item.tag) == '{%s}mptr' % namespaces['']:
+                        try:
+                            if item.attrib['{%s}title' % namespaces['xlink']] in id_updates:
+                                item.attrib['{%s}title' % namespaces['xlink']] = id_updates[
+                                    item.attrib['{%s}title' % namespaces['xlink']]]
+                            else:
+                                item.attrib['{%s}title' % namespaces['xlink']] = new_uuid()
+                        except KeyError:
+                            pass
+                    else:
+                        print('Warning: Got unsupported pointer:', item.attrib['LABEL'], item.tag,
+                              "while updating mets ID")
         else:
             for item in div:
                 if str(item.tag) == '{%s}fptr' % namespaces['']:
                     if item.attrib['FILEID'] in id_updates:
                         item.attrib['FILEID'] = id_updates[item.attrib['FILEID']]
+                    else:
+                        item.attrib['FILEID'] = new_uuid()
                 elif str(item.tag) == '{%s}mptr' % namespaces['']:
                     try:
                         if item.attrib['{%s}title' % namespaces['xlink']] in id_updates:
                             item.attrib['{%s}title' % namespaces['xlink']] = id_updates[
                                 item.attrib['{%s}title' % namespaces['xlink']]]
+                        else:
+                            item.attrib['{%s}title' % namespaces['xlink']] = new_uuid()
                     except KeyError:
                         pass
                 else:
                     print('Warning: Got unsupported pointer:', item.attrib['LABEL'], item.tag, "while updating mets ID")
 
 
-def create_root_aip_mets(sip_mets, aip_root, id_updates):
+def get_namespaces(mets_file):
+
+    # register namespaces to ET parser
+    namespaces = {}
+    for key, value in ET.iterparse(mets_file, events=['start-ns']):
+        ET.register_namespace(value[0], value[1])
+        namespaces[value[0]] = value[1]
+    return namespaces
+
+
+def create_aip_rep_mets(sip_rep_mets, rep_root):
+    """
+
+    :param sip_rep_mets:
+    :param rep_root:
+    :return:
+    """
+    namespaces = get_namespaces(sip_rep_mets)
+    tree = ET.parse(sip_rep_mets)
+    root = tree.getroot()
+    created_now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+
+    root.attrib['OBJID'] = rep_root.name
+
+    # METS HEADER
+    metshdr_elemet = root.find('{%s}metsHdr' % namespaces[''])
+    metshdr_elemet.attrib['LASTMODDATE'] = created_now
+    metshdr_elemet.attrib['RECORDSTATUS'] = 'Revised'
+    try:
+        metshdr_elemet.attrib['{%s}OAISPACKAGETYPE' % namespaces['csip']] = 'AIP'
+    except KeyError:
+        print("Warning: metsHdr doesn't containt OAISPACKAGETYPE")
+
+    # FILE SECTION
+    filesec_element = root.find('{%s}fileSec' % namespaces[''])
+
+    for fileGrp in filesec_element.findall('{%s}fileGrp' % namespaces['']):
+        filesec_element.remove(fileGrp)
+
+    new_filegrp = ET.Element('{%s}fileGrp' % namespaces[''])
+    new_filegrp_id = new_uuid()
+    new_filegrp.attrib['ID'] = new_filegrp_id
+    new_filegrp.attrib['USE'] = 'Data'
+
+    for file in Path(rep_root / 'data').iterdir():
+        # file_path = rep_root / 'data' / file
+        new_file = ET.Element('{%s}file' % namespaces[''])
+        new_file.attrib['ID'] = new_uuid()
+        new_file.attrib['MIMETYPE'] = str(mimetypes.guess_type(file)[0])
+        new_file.attrib['SIZE'] = str(file.stat().st_size)
+        new_file.attrib['CREATED'] = created_now
+        new_file.attrib['CHECKSUM'] = get_checksum(file)
+        new_file.attrib['CHECKSUMTYPE'] = 'SHA-256'
+
+        new_flocat = ET.Element('{%s}FLocat' % namespaces[''])
+        new_flocat.attrib['{%s}type' % namespaces['xlink']] = 'simple'
+        new_flocat.attrib['{%s}href' % namespaces['xlink']] = 'data/' + file.name
+        new_flocat.attrib['LOCTYPE'] = 'URL'
+
+        new_file.append(new_flocat)
+        new_filegrp.append(new_file)
+    filesec_element.append(new_filegrp)
+
+    structmap_element = root.find('{%s}structMap' % namespaces[''])
+    root_div_elements = structmap_element.findall('{%s}div' % namespaces[''])
+    for div in root_div_elements:
+        structmap_element.remove(div)
+    new_div = ET.Element('{%s}div' % namespaces[''])
+    new_div.attrib['ID'] = new_uuid()
+    new_div.attrib['TYPE'] = 'ORIGINAL'
+    new_div.attrib['LABEL'] = root.attrib['OBJID']
+
+    new_sub_div = ET.Element('{%s}div' % namespaces[''])
+    new_sub_div.attrib['ID'] = new_uuid()
+    new_sub_div.attrib['LABEL'] = 'DATA'
+
+    new_fptr = ET.Element('{%s}fptr' % namespaces[''])
+    new_fptr.attrib['FILEID'] = new_filegrp_id
+
+    new_sub_div.append(new_fptr)
+    new_div.append(new_sub_div)
+    structmap_element.append(new_div)
+
+    # UPDATE IDS
+    update_all_mets_ids(tree, {}, namespaces)
+
+    ET.indent(tree, space='    ', level=0)
+    tree.write(rep_root / 'METS.xml', encoding='utf-8', xml_declaration=True)
+    print("METS written in:", rep_root)
+
+
+def create_aip_root_mets(sip_mets, aip_root, id_updates):
     """
     The structure of the SIP and AIP are similar so it is possible to alter the SIP METS.xml to
     This method maintains namespaces with the original SIP mets and uses it as a template. The necessary adjustments are
@@ -213,11 +306,8 @@ def create_root_aip_mets(sip_mets, aip_root, id_updates):
     :param dict id_updates: Tracks ID changed to ensure connections remain
     :return:
     """
-    # register namespaces to ET parser
-    namespaces = {}
-    for key, value in ET.iterparse(sip_mets, events=['start-ns']):
-        ET.register_namespace(value[0], value[1])
-        namespaces[value[0]] = value[1]
+
+    namespaces = get_namespaces(sip_mets)
 
     tree = ET.parse(sip_mets)
     root = tree.getroot()
@@ -235,16 +325,18 @@ def create_root_aip_mets(sip_mets, aip_root, id_updates):
     # FILE SECTION
     filesec_element = root.find('{%s}fileSec' % namespaces[''])
 
+    # NEW SUBMISSION GROUP + FILES
+    submission_mets = aip_root / 'submission' / 'METS.xml'
     new_filegrp = ET.Element('{%s}fileGrp' % namespaces[''])
     new_filegrp.attrib['ID'] = new_uuid()
-    new_filegrp.attrib['USE'] = 'submission'
+    new_filegrp.attrib['USE'] = 'Submission'
 
     new_file = ET.Element('{%s}file' % namespaces[''])
     new_file.attrib['ID'] = new_uuid()
-    new_file.attrib['MIMETYPE'] = str(mimetypes.guess_type(sip_mets)[0])
-    new_file.attrib['SIZE'] = str(sip_mets.stat().st_size)
+    new_file.attrib['MIMETYPE'] = str(mimetypes.guess_type(submission_mets)[0])
+    new_file.attrib['SIZE'] = str(submission_mets.stat().st_size)
     new_file.attrib['CREATED'] = created_now
-    new_file.attrib['CHECKSUM'] = get_checksum(sip_mets)
+    new_file.attrib['CHECKSUM'] = get_checksum(submission_mets)
     new_file.attrib['CHECKSUMTYPE'] = 'SHA-256'
 
     new_flocat = ET.Element('{%s}FLocat' % namespaces[''])
@@ -299,7 +391,7 @@ def create_root_aip_mets(sip_mets, aip_root, id_updates):
                         rep = sub_div.attrib['LABEL']
                         rep_name = rep.rstrip('0123456789')
                         rep_number = "{:02}.1".format(int(rep[len(rep_name):]))
-                        sub_div.attrib['LABEL'] = rep_name+rep_number
+                        sub_div.attrib['LABEL'] = rep_name + rep_number
                         preservation_rep_path = "{}/{}{}".format('representations', 'rep', rep_number)
                         for pointer in sub_div:
                             if str(pointer.tag) == '{%s}mptr' % namespaces['']:
@@ -307,18 +399,31 @@ def create_root_aip_mets(sip_mets, aip_root, id_updates):
             elif len(rep_parts) == 2:
                 rep_name = rep_parts[1].rstrip('0123456789')
                 rep_number = "{:02}.1".format(int(rep_parts[1][len(rep_name):]))
-
                 preservation_rep_path = "{}/{}{}".format('representations', rep_name, rep_number)
                 div.attrib['LABEL'] = preservation_rep_path
                 for pointer in div:
                     if str(pointer.tag) == '{%s}mptr' % namespaces['']:
                         pointer.attrib['{%s}href' % namespaces['xlink']] = preservation_rep_path + '/METS.xml'
+        if div.attrib['LABEL'].lower() == 'submission':
+            root_div_element.remove(div)
+
+    new_submission_div = ET.Element('{%s}div' % namespaces[''])
+    new_submission_div.attrib['ID'] = new_uuid()
+    new_submission_div.attrib['LABEL'] = 'submission'
+    new_submission_mptr = ET.Element('{%s}mptr' % namespaces[''])
+    new_submission_mptr.attrib['{%s}type' % namespaces['xlink']] = 'simple'
+    new_submission_mptr.attrib['{%s}href' % namespaces['xlink']] = 'submission/METS.xml'
+    new_submission_mptr.attrib['{%s}title' % namespaces['xlink']] = new_uuid()
+    new_submission_mptr.attrib['LOCTYPE'] = 'URL'
+    new_submission_div.append(new_submission_mptr)
+    root_div_element.append(new_submission_div)
 
     # UPDATE IDS
     update_all_mets_ids(tree, id_updates, namespaces)
 
     ET.indent(tree, space='    ', level=0)
-    tree.write('%s/METS.xml' % aip_root, encoding='utf-8', xml_declaration=True)
+    tree.write(aip_root / 'METS.xml', encoding='utf-8', xml_declaration=True)
+    print("METS written in:", aip_root)
 
 
 def copy_sip_to_aip(sip_path, aip_path):
@@ -373,8 +478,11 @@ def create_aip_representations(aip_path):
         # make preservation directory : rep1 -> rep01.1
         preservation_rep_path = aip_path / "representations" / "{}{:02}.1".format('rep', rep_number)
         (preservation_rep_path / "data").mkdir(parents=True)
+        with open(preservation_rep_path / 'data' / 'TestAMTransfer.txt', 'w') as f:
+            f.write("Just some random text")
         # create preservation rep METS.xml
-        create_mets(preservation_rep_path)
+        # create_mets(preservation_rep_path)
+        create_aip_rep_mets(aip_submission_representations_path / rep / 'METS.xml', preservation_rep_path)
 
 
 def transform_sip_to_aip(sip_path, aip_path):
@@ -399,7 +507,7 @@ def transform_sip_to_aip(sip_path, aip_path):
 
     sip_mets = Path(sip_path / 'METS.xml')
 
-    create_root_aip_mets(sip_mets, aip_path, id_updates)
+    create_aip_root_mets(sip_mets, aip_path, id_updates)
 
     # TODO:
     #  - Transfer archivematica AIP into preservation
@@ -431,7 +539,7 @@ def create_fse(current_path, aip_root_path):
     except IndexError:
         fse_use = 'original'
     else:
-        if len(relative_path.parts) > 1 and relative_path.parts[0] == 'representations':
+        if len(relative_path.parts) > 1 and relative_path.parts[0].lower == 'representations':
             fse_use = '{}/{}'.format(relative_path.parts[0], relative_path.parts[1])
 
     if "METS.xml" in os.listdir(current_path):
