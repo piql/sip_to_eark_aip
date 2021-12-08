@@ -3,15 +3,12 @@ import mimetypes
 import os
 import shutil
 import sys
+import time
 import uuid
 import metsrw
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
-
-
-# logs_file_path = "./app.log"
-# sys.stdout = open(logs_file_path, "w", buffering=1, encoding='utf-8')
 
 
 def get_arg(index):
@@ -233,25 +230,19 @@ def create_aip_rep_mets(sip_rep_mets, rep_root):
     for fileGrp in filesec_element.findall('{%s}fileGrp' % namespaces['']):
         filesec_element.remove(fileGrp)
 
-    new_filegrp = ET.Element('{%s}fileGrp' % namespaces[''])
     new_filegrp_id = new_uuid()
-    new_filegrp.attrib['ID'] = new_filegrp_id
-    new_filegrp.attrib['USE'] = 'Data'
+    new_filegrp = ET.Element('{%s}fileGrp' % namespaces[''], attrib={'ID': new_filegrp_id, 'USE': 'Data'})
 
     for file in Path(rep_root / 'data').iterdir():
-        new_file = ET.Element('{%s}file' % namespaces[''])
-        new_file.attrib['ID'] = new_uuid()
-        new_file.attrib['MIMETYPE'] = str(mimetypes.guess_type(file)[0])
-        new_file.attrib['SIZE'] = str(file.stat().st_size)
-        new_file.attrib['CREATED'] = created_now
-        new_file.attrib['CHECKSUM'] = get_checksum(file)
-        new_file.attrib['CHECKSUMTYPE'] = 'SHA-256'
+        new_file = ET.Element('{%s}file' % namespaces[''],
+                              attrib={'ID': new_uuid(), 'MIMETYPE': str(mimetypes.guess_type(file)[0]),
+                                      'SIZE': str(file.stat().st_size), 'CREATED': created_now,
+                                      'CHECKSUM': get_checksum(file), 'CHECKSUMTYPE': 'SHA-256'})
 
-        new_flocat = ET.Element('{%s}FLocat' % namespaces[''])
-        new_flocat.attrib['{%s}type' % namespaces['xlink']] = 'simple'
-        new_flocat.attrib['{%s}href' % namespaces['xlink']] = 'data/' + file.name
-        new_flocat.attrib['LOCTYPE'] = 'URL'
-
+        new_flocat = ET.Element('{%s}FLocat' % namespaces[''],
+                                attrib={'{%s}type' % namespaces['xlink']: 'simple',
+                                        '{%s}href' % namespaces['xlink']: 'data/' + file.name,
+                                        'LOCTYPE': 'URL'})
         new_file.append(new_flocat)
         new_filegrp.append(new_file)
     filesec_element.append(new_filegrp)
@@ -260,17 +251,11 @@ def create_aip_rep_mets(sip_rep_mets, rep_root):
     root_div_elements = structmap_element.findall('{%s}div' % namespaces[''])
     for div in root_div_elements:
         structmap_element.remove(div)
-    new_div = ET.Element('{%s}div' % namespaces[''])
-    new_div.attrib['ID'] = new_uuid()
-    new_div.attrib['TYPE'] = 'ORIGINAL'
-    new_div.attrib['LABEL'] = root.attrib['OBJID']
+    new_div = ET.Element('{%s}div' % namespaces[''], attrib={'ID': new_uuid(), 'TYPE': 'ORIGINAL',
+                                                             'LABEL': root.attrib['OBJID']})
+    new_sub_div = ET.Element('{%s}div' % namespaces[''], attrib={'ID': new_uuid(), 'LABEL': 'DATA'})
 
-    new_sub_div = ET.Element('{%s}div' % namespaces[''])
-    new_sub_div.attrib['ID'] = new_uuid()
-    new_sub_div.attrib['LABEL'] = 'DATA'
-
-    new_fptr = ET.Element('{%s}fptr' % namespaces[''])
-    new_fptr.attrib['FILEID'] = new_filegrp_id
+    new_fptr = ET.Element('{%s}fptr' % namespaces[''], attrib={'FILEID': new_filegrp_id})
 
     new_sub_div.append(new_fptr)
     new_div.append(new_sub_div)
@@ -326,24 +311,17 @@ def create_aip_root_mets(sip_mets, aip_root, id_updates):
 
     # NEW SUBMISSION GROUP + FILES
     submission_mets = aip_root / 'submission' / 'METS.xml'
-    new_filegrp = ET.Element('{%s}fileGrp' % namespaces[''])
-
     new_sub_id = new_uuid()
-    new_filegrp.attrib['ID'] = new_sub_id
-    new_filegrp.attrib['USE'] = 'Submission'
+    new_filegrp = ET.Element('{%s}fileGrp' % namespaces[''], attrib={'ID': new_sub_id, 'USE': 'Submission'})
 
-    new_file = ET.Element('{%s}file' % namespaces[''])
-    new_file.attrib['ID'] = new_uuid()
-    new_file.attrib['MIMETYPE'] = str(mimetypes.guess_type(submission_mets)[0])
-    new_file.attrib['SIZE'] = str(submission_mets.stat().st_size)
-    new_file.attrib['CREATED'] = created_now
-    new_file.attrib['CHECKSUM'] = get_checksum(submission_mets)
-    new_file.attrib['CHECKSUMTYPE'] = 'SHA-256'
+    new_file = ET.Element('{%s}file' % namespaces[''],
+                          attrib={'ID': new_uuid(),'MIMETYPE': str(mimetypes.guess_type(submission_mets)[0]),
+                                  'SIZE': str(submission_mets.stat().st_size), 'CREATED': created_now,
+                                  'CHECKSUM': get_checksum(submission_mets), 'CHECKSUMTYPE': 'SHA-256'})
 
-    new_flocat = ET.Element('{%s}FLocat' % namespaces[''])
-    new_flocat.attrib['{%s}type' % namespaces['xlink']] = 'simple'
-    new_flocat.attrib['{%s}href' % namespaces['xlink']] = 'submission/METS.xml'
-    new_flocat.attrib['LOCTYPE'] = 'URL'
+    new_flocat = ET.Element('{%s}FLocat' % namespaces[''],
+                            attrib={'{%s}type' % namespaces['xlink']: 'simple',
+                                    '{%s}href' % namespaces['xlink']: 'submission/METS.xml', 'LOCTYPE': 'URL'})
 
     new_file.append(new_flocat)
     new_filegrp.append(new_file)
@@ -365,13 +343,13 @@ def create_aip_root_mets(sip_mets, aip_root, id_updates):
                 rep_name = sub_filegrp.attrib['USE'] = get_preservation_reps_name(sub_filegrp.attrib['USE'])
                 sub_filegrp.attrib['ID'] = new_uuid()
             elif len(rep_parts) == 2:  # 'Representations/repx'
-                new_filegrp = ET.Element('{%s}fileGrp' % namespaces[''])
-                new_filegrp.attrib['ID'] = new_uuid()
+                new_filegrp = ET.Element('{%s}fileGrp' % namespaces[''], attrib={'ID': new_uuid()})
                 rep_name = new_filegrp.attrib['USE'] = get_preservation_reps_name(rep_parts[1])
                 old_file = fileGrp.find('{%s}file' % namespaces[''])
                 fileGrp.remove(old_file)
                 new_filegrp.append(old_file)
                 fileGrp.append(new_filegrp)
+
             else:
                 print('ERROR in METS.xml representations structure')
                 sys.exit(1)
@@ -394,7 +372,8 @@ def create_aip_root_mets(sip_mets, aip_root, id_updates):
                         file.attrib['CHECKSUMTYPE'] = 'SHA-256'
                         flocat.attrib['{%s}href' % namespaces['xlink']] = preservation_rep_path + '/METS.xml'
                 else:
-                    print("Incorrect count of files in SIP representations fileGrp:", fileGrp.tag, fileGrp.attrib)
+                    print("Incorrect count of files in SIP representations fileGrp. Found:", len(file_elements),
+                          '. Expected: 1')
                     sys.exit(1)
             else:
                 print('ERROR: Expected Preservation METS.xml')
@@ -407,7 +386,7 @@ def create_aip_root_mets(sip_mets, aip_root, id_updates):
     for div in root_div_element.findall('{%s}div' % namespaces['']):
         if div.attrib['LABEL'].lower().startswith('representations'):
             rep_parts = Path(div.attrib['LABEL']).parts
-            if len(rep_parts) == 1:
+            if len(rep_parts) == 1:  # 'Representations'
                 for sub_div in div.findall('{%s}div' % namespaces['']):
                     if sub_div.attrib['LABEL'].lower().startswith('rep'):
                         rep = sub_div.attrib['LABEL']
@@ -418,26 +397,34 @@ def create_aip_root_mets(sip_mets, aip_root, id_updates):
                         for pointer in sub_div:
                             if str(pointer.tag) == '{%s}mptr' % namespaces['']:
                                 pointer.attrib['{%s}href' % namespaces['xlink']] = preservation_rep_path + '/METS.xml'
-            elif len(rep_parts) == 2:
+            elif len(rep_parts) == 2:  # 'Representations/repx'
                 rep_name = rep_parts[1].rstrip('0123456789')
                 rep_number = "{:02}.1".format(int(rep_parts[1][len(rep_name):]))
                 preservation_rep_path = "{}/{}{}".format('representations', rep_name, rep_number)
-                div.attrib['LABEL'] = preservation_rep_path
+                div.attrib['LABEL'] = 'Representation'
+
+                new_sub_div = ET.Element('{%s}div' % namespaces[''], attrib={'ID': '', 'LABEL': rep_name+rep_number})
+                div.append(new_sub_div)
+
+                item = div.find('{%s}mptr' % namespaces[''])
+                div.remove(item)
+                new_sub_div.append(item)
+
                 for pointer in div:
                     if str(pointer.tag) == '{%s}mptr' % namespaces['']:
                         pointer.attrib['{%s}href' % namespaces['xlink']] = preservation_rep_path + '/METS.xml'
         if div.attrib['LABEL'].lower() == 'submission':
             root_div_element.remove(div)
 
-    new_sub_div = ET.Element('{%s}div' % namespaces[''])
-    # id_updates[new_sub_id] = new_sub_id
-    new_sub_div.attrib['ID'] = new_sub_id
-    new_sub_div.attrib['LABEL'] = 'Submission'
-    new_sub_mptr = ET.Element('{%s}mptr' % namespaces[''])
-    new_sub_mptr.attrib['{%s}type' % namespaces['xlink']] = 'simple'
-    new_sub_mptr.attrib['{%s}href' % namespaces['xlink']] = 'submission/METS.xml'
-    new_sub_mptr.attrib['{%s}title' % namespaces['xlink']] = new_sub_id
-    new_sub_mptr.attrib['LOCTYPE'] = 'URL'
+    new_sub_div = ET.Element('{%s}div' % namespaces[''],
+                             attrib={'ID': new_sub_id,
+                                     'LABEL': 'Submission'})
+    new_sub_mptr = ET.Element(
+        '{%s}mptr' % namespaces[''],
+        attrib={'{%s}type' % namespaces['xlink']: 'simple',
+                '{%s}href' % namespaces['xlink']: 'submission/METS.xml',
+                '{%s}title' % namespaces['xlink']: new_sub_id, 'LOCTYPE': 'URL'}
+    )
     new_sub_div.append(new_sub_mptr)
     root_div_element.append(new_sub_div)
 
@@ -535,12 +522,12 @@ def transform_sip_to_aip(sip_path, aip_path):
 
     descriptive_metadata_file = aip_path / 'metadata' / 'descriptive' / 'dc.xml'
     if descriptive_metadata_file.exists():
-        desc_ET = ET.parse(descriptive_metadata_file)
-        desc_root = desc_ET.getroot()
+        desc_tree = ET.parse(descriptive_metadata_file)
+        desc_root = desc_tree.getroot()
         for child in desc_root:
             if child.text == sip_uuid:
                 child.text = aip_uuid
-        desc_ET.write(descriptive_metadata_file, encoding='utf-8', xml_declaration=True)
+        desc_tree.write(descriptive_metadata_file, encoding='utf-8', xml_declaration=True)
 
     # TODO:
     #  - Transfer archivematica AIP into preservation
@@ -601,7 +588,9 @@ def create_fse(current_path, aip_root_path):
 if __name__ == '__main__':
     if len(sys.argv) == 3:
         if validate_directories(Path(get_arg(1)), Path(get_arg(2))):
+            start = time.time()
             transform_sip_to_aip(Path(get_arg(1)), Path(get_arg(2)))
+            print('It took', time.time() - start, 'seconds.')
         else:
             sys.exit(1)
     else:
