@@ -195,10 +195,9 @@ def update_all_mets_ids(mets_tree, id_updates, namespaces):
 
 def get_namespaces(mets_file):
     # register namespaces to ET parser
-    namespaces = {}
-    for key, value in ET.iterparse(mets_file, events=['start-ns']):
-        ET.register_namespace(value[0], value[1])
-        namespaces[value[0]] = value[1]
+    namespaces = {value[0]: value[1] for key, value in ET.iterparse(mets_file, events=['start-ns'])}
+    for key in namespaces:
+        ET.register_namespace(key, namespaces[key])
     return namespaces
 
 
@@ -315,7 +314,7 @@ def create_aip_root_mets(sip_mets, aip_root, id_updates):
     new_filegrp = ET.Element('{%s}fileGrp' % namespaces[''], attrib={'ID': new_sub_id, 'USE': 'Submission'})
 
     new_file = ET.Element('{%s}file' % namespaces[''],
-                          attrib={'ID': new_uuid(),'MIMETYPE': str(mimetypes.guess_type(submission_mets)[0]),
+                          attrib={'ID': new_uuid(), 'MIMETYPE': str(mimetypes.guess_type(submission_mets)[0]),
                                   'SIZE': str(submission_mets.stat().st_size), 'CREATED': created_now,
                                   'CHECKSUM': get_checksum(submission_mets), 'CHECKSUMTYPE': 'SHA-256'})
 
@@ -403,7 +402,7 @@ def create_aip_root_mets(sip_mets, aip_root, id_updates):
                 preservation_rep_path = "{}/{}{}".format('representations', rep_name, rep_number)
                 div.attrib['LABEL'] = 'Representation'
 
-                new_sub_div = ET.Element('{%s}div' % namespaces[''], attrib={'ID': '', 'LABEL': rep_name+rep_number})
+                new_sub_div = ET.Element('{%s}div' % namespaces[''], attrib={'ID': '', 'LABEL': rep_name + rep_number})
                 div.append(new_sub_div)
 
                 item = div.find('{%s}mptr' % namespaces[''])
@@ -495,7 +494,7 @@ def create_aip_representations(aip_path):
 
 
 def transform_sip_to_aip(sip_path, aip_path):
-    if True:
+    if False:
         sip_name = sip_path.stem
         sip_uuid = sip_name[sip_name.index('uuid'):]
         package_name = sip_name[:sip_name.index('uuid')]
