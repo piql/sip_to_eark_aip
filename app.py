@@ -280,7 +280,7 @@ def get_preservation_reps_name(rep):
 
 def create_aip_root_mets(sip_mets, aip_root, id_updates):
     """
-    The structure of the SIP and AIP are similar so it is possible to alter the SIP METS.xml to
+    The structure of the SIP and AIP are similar so it is possible to alter the SIP METS.xml
     This method maintains namespaces with the original SIP mets and uses it as a template. The necessary adjustments are
     made to make it a conformant EARK AIP mets file.
     :param Path sip_mets: Path to SIP METS to use as template
