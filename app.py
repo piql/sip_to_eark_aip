@@ -538,8 +538,6 @@ def transform_sip_to_aip(sip_path, aip_path):
 
     sip_mets = Path(sip_path / 'METS.xml')
 
-    create_aip_root_mets(sip_mets, aip_path, id_updates)
-
     descriptive_metadata_file = aip_path / 'metadata' / 'descriptive' / 'dc.xml'
     if descriptive_metadata_file.exists():
         desc_tree = ET.parse(descriptive_metadata_file)
@@ -548,6 +546,8 @@ def transform_sip_to_aip(sip_path, aip_path):
             if child.text == sip_uuid:
                 child.text = aip_uuid
         desc_tree.write(descriptive_metadata_file, encoding='utf-8', xml_declaration=True)
+
+    create_aip_root_mets(sip_mets, aip_path, id_updates)
 
     # TODO:
     #  - Transfer archivematica AIP into preservation
