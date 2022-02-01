@@ -303,7 +303,28 @@ def create_aip_root_mets(sip_mets, aip_root, id_updates):
     try:
         metshdr_elemet.attrib['{%s}OAISPACKAGETYPE' % namespaces['csip']] = 'AIP'
     except KeyError:
-        print("Warning: metsHdr doesn't containt OAISPACKAGETYPE")
+        print("Warning: metsHdr doesn't contain OAISPACKAGETYPE")
+
+
+    # DMD SEC
+    # Expected SHA-256 checksum
+    try:
+        dmdsec_element = root.find('{%s}dmdSec' % namespaces[''])
+    except KeyError:
+        print('No dmd sec found')
+    else:
+        try:
+            mdref_element = dmdsec_element.find('{%s}mdRef' % namespaces[''])
+        except KeyError:
+            print('No mdRef found in dmdSec')
+        else:
+            href = Path(mdref_element.attrib['{%s}href' % namespaces['xlink']])
+            metadata_location = aip_root / href
+            print(metadata_location)
+            print(str(metadata_location.stat().st_size))
+            mdref_element.attrib['SIZE'] = str(metadata_location.stat().st_size)
+            mdref_element.attrib['CHECKSUM'] = get_checksum(metadata_location)
+        
 
     # FILE SECTION
     filesec_element = root.find('{%s}fileSec' % namespaces[''])
