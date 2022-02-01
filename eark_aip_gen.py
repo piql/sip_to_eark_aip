@@ -46,7 +46,7 @@ def validate_directories(sip_dir, output_dir):
                 else:
                     print("Error: Output is not a directory")
             else:
-                print("Error: Output directory doesn't exit")
+                return True
         else:
             print("Error: Input is not a directory")
     else:
@@ -63,11 +63,7 @@ def overwrite_and_create_directory(directory):
     if directory.is_dir():
         print("Overwriting '%s'" % directory)
         shutil.rmtree(directory)
-    try:
-        directory.mkdir(exist_ok=False)
-    except FileExistsError as e:
-        print(e)
-        print('Error with AIP overwrite')
+    directory.mkdir(parents=True, exist_ok=False)
 
 
 def validate_representations_sequence(representations_path):
@@ -106,6 +102,10 @@ def new_uuid():
     return 'uuid-' + str(uuid.uuid4())
 
 
+def new_id():
+    return 'ID' + str(uuid.uuid4())
+
+
 def update_all_mets_ids(mets_tree, id_updates, namespaces):
     """
     Updates all IDS in a mets file
@@ -130,11 +130,11 @@ def update_all_mets_ids(mets_tree, id_updates, namespaces):
             for sub_filegrp in filegrp.findall('{%s}fileGrp' % namespaces['']):
                 id_updates[sub_filegrp.attrib['ID']] = sub_filegrp.attrib['ID'] = new_uuid()
                 for file_element in sub_filegrp.findall('{%s}file' % namespaces['']):
-                    id_updates[file_element.attrib['ID']] = file_element.attrib['ID'] = new_uuid()
+                    id_updates[file_element.attrib['ID']] = file_element.attrib['ID'] = new_id()
         else:
             id_updates[filegrp.attrib['ID']] = filegrp.attrib['ID'] = new_uuid()
             for file_element in filegrp.findall('{%s}file' % namespaces['']):
-                id_updates[file_element.attrib['ID']] = file_element.attrib['ID'] = new_uuid()
+                id_updates[file_element.attrib['ID']] = file_element.attrib['ID'] = new_id()
 
     structmap_element = root.find('{%s}structMap' % namespaces[''])
     structmap_element.attrib['ID'] = new_uuid()
@@ -234,7 +234,7 @@ def create_aip_rep_mets(sip_rep_mets, rep_root):
 
     for file in Path(rep_root / 'data').iterdir():
         new_file = ET.Element('{%s}file' % namespaces[''],
-                              attrib={'ID': new_uuid(), 'MIMETYPE': str(mimetypes.guess_type(file)[0]),
+                              attrib={'ID': new_id(), 'MIMETYPE': str(mimetypes.guess_type(file)[0]),
                                       'SIZE': str(file.stat().st_size), 'CREATED': created_now,
                                       'CHECKSUM': get_checksum(file), 'CHECKSUMTYPE': 'SHA-256'})
 
@@ -280,7 +280,7 @@ def get_preservation_reps_name(rep):
 
 def create_aip_root_mets(sip_mets, aip_root, id_updates):
     """
-    The structure of the SIP and AIP are similar so it is possible to alter the SIP METS.xml to
+    The structure of the SIP and AIP are similar so it is possible to alter the SIP METS.xml
     This method maintains namespaces with the original SIP mets and uses it as a template. The necessary adjustments are
     made to make it a conformant EARK AIP mets file.
     :param Path sip_mets: Path to SIP METS to use as template
@@ -303,7 +303,26 @@ def create_aip_root_mets(sip_mets, aip_root, id_updates):
     try:
         metshdr_elemet.attrib['{%s}OAISPACKAGETYPE' % namespaces['csip']] = 'AIP'
     except KeyError:
-        print("Warning: metsHdr doesn't containt OAISPACKAGETYPE")
+        print("Warning: metsHdr doesn't contain OAISPACKAGETYPE")
+
+
+    # DMD SEC
+    # Expected SHA-256 checksum
+    try:
+        dmdsec_element = root.find('{%s}dmdSec' % namespaces[''])
+    except KeyError:
+        print('No dmd sec found')
+    else:
+        try:
+            mdref_element = dmdsec_element.find('{%s}mdRef' % namespaces[''])
+        except KeyError:
+            print('No mdRef found in dmdSec')
+        else:
+            href = Path(mdref_element.attrib['{%s}href' % namespaces['xlink']])
+            metadata_location = aip_root / href
+            mdref_element.attrib['SIZE'] = str(metadata_location.stat().st_size)
+            mdref_element.attrib['CHECKSUM'] = get_checksum(metadata_location)
+        
 
     # FILE SECTION
     filesec_element = root.find('{%s}fileSec' % namespaces[''])
@@ -314,7 +333,7 @@ def create_aip_root_mets(sip_mets, aip_root, id_updates):
     new_filegrp = ET.Element('{%s}fileGrp' % namespaces[''], attrib={'ID': new_sub_id, 'USE': 'Submission'})
 
     new_file = ET.Element('{%s}file' % namespaces[''],
-                          attrib={'ID': new_uuid(), 'MIMETYPE': str(mimetypes.guess_type(submission_mets)[0]),
+                          attrib={'ID': new_id(), 'MIMETYPE': str(mimetypes.guess_type(submission_mets)[0]),
                                   'SIZE': str(submission_mets.stat().st_size), 'CREATED': created_now,
                                   'CHECKSUM': get_checksum(submission_mets), 'CHECKSUMTYPE': 'SHA-256'})
 
@@ -333,8 +352,7 @@ def create_aip_root_mets(sip_mets, aip_root, id_updates):
             rep_use = fileGrp.attrib['USE']
             rep_parts = Path(rep_use).parts
 
-            new_id = new_uuid()
-            id_updates[fileGrp.attrib['ID']] = fileGrp.attrib['ID'] = new_id
+            id_updates[fileGrp.attrib['ID']] = fileGrp.attrib['ID'] = new_uuid()
             fileGrp.attrib['USE'] = 'Representations'
 
             if len(rep_parts) == 1:  # 'Representations'
@@ -517,8 +535,6 @@ def transform_sip_to_aip(sip_path, aip_path):
 
     sip_mets = Path(sip_path / 'METS.xml')
 
-    create_aip_root_mets(sip_mets, aip_path, id_updates)
-
     descriptive_metadata_file = aip_path / 'metadata' / 'descriptive' / 'dc.xml'
     if descriptive_metadata_file.exists():
         desc_tree = ET.parse(descriptive_metadata_file)
@@ -527,6 +543,8 @@ def transform_sip_to_aip(sip_path, aip_path):
             if child.text == sip_uuid:
                 child.text = aip_uuid
         desc_tree.write(descriptive_metadata_file, encoding='utf-8', xml_declaration=True)
+
+    create_aip_root_mets(sip_mets, aip_path, id_updates)
 
     # TODO:
     #  - Transfer archivematica AIP into preservation
