@@ -29,6 +29,12 @@ def get_checksum(file):
 
 
 def validate_directories(sip_dir, output_dir):
+    """
+    Ensures sip_dir exists and is a dir. If output_dir exists ensure it is a directory
+        :param Path sip_dir: location of the sip
+        :param Path output_dir: desired output location
+        :return Boolean: True if valid
+    """
     if sip_dir.exists():
         if sip_dir.is_dir():
             if output_dir.exists():
@@ -58,7 +64,6 @@ def overwrite_and_create_directory(directory):
     """
     Deletes directory if it exists and (re)creates directory
     :param Path directory: path that needs to be (re)created
-    :return Boolean: if successful
     """
     if directory.is_dir():
         print("Overwriting '%s'" % directory)
@@ -108,10 +113,10 @@ def new_id():
 
 def update_all_mets_ids(mets_tree, id_updates, namespaces):
     """
-    Updates all IDS in a mets file
+    Updates all IDS in a mets file while maintaining connections using dict of updated IDs
     :param ElementTree mets_tree: tree for IDs to be updated on
     :param dict id_updates: contains tracked changes in ID's to maintain connections
-    :param dict namespaces: contains namespaces ad their schema locations
+    :param dict namespaces: contains namespaces and their schema locations
     """
     root = mets_tree.getroot()
     dmdsec_elements = root.findall('{%s}dmdSec' % namespaces[''])
@@ -203,8 +208,9 @@ def get_namespaces(mets_file):
 
 def create_aip_rep_mets(sip_rep_mets, rep_root):
     """
-    :param sip_rep_mets:
-    :param rep_root:
+    Generate preservation METs.xml in representations using sip rep mets as template
+    :param sip_rep_mets: location of reference mets
+    :param rep_root: preservation directory (representations/rep01.1)
     :return:
     """
     namespaces = get_namespaces(sip_rep_mets)
@@ -269,6 +275,9 @@ def create_aip_rep_mets(sip_rep_mets, rep_root):
 
 
 def get_preservation_reps_name(rep):
+    """
+    Rename repx to rep0x.1
+    """
     rep_name = rep.rstrip('0123456789')
     try:
         rep_num = "{:02}.1".format(int(rep[len(rep_name):]))
@@ -286,7 +295,6 @@ def create_aip_root_mets(sip_mets, aip_root, id_updates):
     :param Path sip_mets: Path to SIP METS to use as template
     :param Path aip_root: Path to AIP root where METS will be written
     :param dict id_updates: Tracks ID changed to ensure connections remain
-    :return:
     """
 
     namespaces = get_namespaces(sip_mets)
@@ -456,9 +464,8 @@ def create_aip_root_mets(sip_mets, aip_root, id_updates):
 def copy_sip_to_aip(sip_path, aip_path):
     """
     Copy the required items from the SIP into the necessary locations in the AIP
-    :param Path sip_path:
-    :param Path aip_path:
-    :return:
+    :param Path sip_path: Location of sip to transform
+    :param Path aip_path: Destination of transformed files (output / path / sipname)
     """
     # copy required items in to submissions and copy in to AIP root if required
     items_to_copy = {'representations': False, 'metadata': True, 'schemas': True, 'documentation': True,
@@ -512,6 +519,7 @@ def create_aip_representations(aip_path):
 
 
 def transform_sip_to_aip(sip_path, aip_path):
+    # Make False for testing to prevent giving aip new uuid and save space
     if False:
         sip_name = sip_path.stem
         sip_uuid = sip_name[sip_name.index('uuid'):]
