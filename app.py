@@ -46,7 +46,7 @@ def validate_directories(sip_dir, output_dir):
                 else:
                     print("Error: Output is not a directory")
             else:
-                print("Error: Output directory doesn't exit")
+                return True
         else:
             print("Error: Input is not a directory")
     else:
@@ -63,11 +63,7 @@ def overwrite_and_create_directory(directory):
     if directory.is_dir():
         print("Overwriting '%s'" % directory)
         shutil.rmtree(directory)
-    try:
-        directory.mkdir(exist_ok=False)
-    except FileExistsError as e:
-        print(e)
-        print('Error with AIP overwrite')
+    directory.mkdir(parents=True, exist_ok=False)
 
 
 def validate_representations_sequence(representations_path):
