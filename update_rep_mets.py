@@ -36,6 +36,9 @@ def get_namespaces(mets_file):
 def new_uuid():
     return 'uuid-' + str(uuid.uuid4())
     
+def new_id():
+    return 'ID' + str(uuid.uuid4())
+
 def get_checksum(file):
     sha256_hash = hashlib.sha256()
     with open(file, "rb") as f:
@@ -90,7 +93,7 @@ def update_mets(directory):
             sys.exit(1)
         
         new_file = ET.Element('{%s}file' % namespaces[''],
-                            attrib={'ID': new_uuid(), 'MIMETYPE': str(mimetypes.guess_type(str(zip_file))[0]),
+                            attrib={'ID': new_id(), 'MIMETYPE': str(mimetypes.guess_type(str(zip_file))[0]),
                                     'SIZE': str(zip_file.stat().st_size), 'CREATED': created_now,
                                     'CHECKSUM': get_checksum(zip_file), 'CHECKSUMTYPE': 'SHA-256'})
         new_flocat = ET.Element('{%s}FLocat' % namespaces[''],
