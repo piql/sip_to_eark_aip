@@ -103,7 +103,7 @@ def new_uuid():
 
 
 def new_id():
-    return 'ID' + str(uuid.uuid4)
+    return 'ID' + str(uuid.uuid4())
 
 
 def update_all_mets_ids(mets_tree, id_updates, namespaces):
@@ -130,11 +130,11 @@ def update_all_mets_ids(mets_tree, id_updates, namespaces):
             for sub_filegrp in filegrp.findall('{%s}fileGrp' % namespaces['']):
                 id_updates[sub_filegrp.attrib['ID']] = sub_filegrp.attrib['ID'] = new_uuid()
                 for file_element in sub_filegrp.findall('{%s}file' % namespaces['']):
-                    id_updates[file_element.attrib['ID']] = file_element.attrib['ID'] = new_uuid()
+                    id_updates[file_element.attrib['ID']] = file_element.attrib['ID'] = new_id()
         else:
             id_updates[filegrp.attrib['ID']] = filegrp.attrib['ID'] = new_uuid()
             for file_element in filegrp.findall('{%s}file' % namespaces['']):
-                id_updates[file_element.attrib['ID']] = file_element.attrib['ID'] = new_uuid()
+                id_updates[file_element.attrib['ID']] = file_element.attrib['ID'] = new_id()
 
     structmap_element = root.find('{%s}structMap' % namespaces[''])
     structmap_element.attrib['ID'] = new_uuid()
@@ -234,7 +234,7 @@ def create_aip_rep_mets(sip_rep_mets, rep_root):
 
     for file in Path(rep_root / 'data').iterdir():
         new_file = ET.Element('{%s}file' % namespaces[''],
-                              attrib={'ID': new_uuid(), 'MIMETYPE': str(mimetypes.guess_type(file)[0]),
+                              attrib={'ID': new_id(), 'MIMETYPE': str(mimetypes.guess_type(file)[0]),
                                       'SIZE': str(file.stat().st_size), 'CREATED': created_now,
                                       'CHECKSUM': get_checksum(file), 'CHECKSUMTYPE': 'SHA-256'})
 
@@ -320,8 +320,6 @@ def create_aip_root_mets(sip_mets, aip_root, id_updates):
         else:
             href = Path(mdref_element.attrib['{%s}href' % namespaces['xlink']])
             metadata_location = aip_root / href
-            print(metadata_location)
-            print(str(metadata_location.stat().st_size))
             mdref_element.attrib['SIZE'] = str(metadata_location.stat().st_size)
             mdref_element.attrib['CHECKSUM'] = get_checksum(metadata_location)
         
@@ -335,7 +333,7 @@ def create_aip_root_mets(sip_mets, aip_root, id_updates):
     new_filegrp = ET.Element('{%s}fileGrp' % namespaces[''], attrib={'ID': new_sub_id, 'USE': 'Submission'})
 
     new_file = ET.Element('{%s}file' % namespaces[''],
-                          attrib={'ID': new_uuid(), 'MIMETYPE': str(mimetypes.guess_type(submission_mets)[0]),
+                          attrib={'ID': new_id(), 'MIMETYPE': str(mimetypes.guess_type(submission_mets)[0]),
                                   'SIZE': str(submission_mets.stat().st_size), 'CREATED': created_now,
                                   'CHECKSUM': get_checksum(submission_mets), 'CHECKSUMTYPE': 'SHA-256'})
 
@@ -354,8 +352,7 @@ def create_aip_root_mets(sip_mets, aip_root, id_updates):
             rep_use = fileGrp.attrib['USE']
             rep_parts = Path(rep_use).parts
 
-            new_id = new_uuid()
-            id_updates[fileGrp.attrib['ID']] = fileGrp.attrib['ID'] = new_id
+            id_updates[fileGrp.attrib['ID']] = fileGrp.attrib['ID'] = new_uuid()
             fileGrp.attrib['USE'] = 'Representations'
 
             if len(rep_parts) == 1:  # 'Representations'
