@@ -102,6 +102,10 @@ def new_uuid():
     return 'uuid-' + str(uuid.uuid4())
 
 
+def new_id():
+    return 'ID' + str(uuid.uuid4)
+
+
 def update_all_mets_ids(mets_tree, id_updates, namespaces):
     """
     Updates all IDS in a mets file
