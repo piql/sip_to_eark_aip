@@ -37,7 +37,7 @@ def new_uuid():
     return 'uuid-' + str(uuid.uuid4())
     
 def new_id():
-    return 'ID' + str(uuid.uuid4())
+    return 'ID-' + str(uuid.uuid4())
 
 def get_checksum(file):
     sha256_hash = hashlib.sha256()
@@ -101,10 +101,9 @@ def update_mets(directory):
                                         '{%s}href' % namespaces['xlink']: 'data/' + zip_file.name,
                                         'LOCTYPE': 'URL'})
         new_file.append(new_flocat)
-        filegrp_elements[0].append(new_file)
-
         filegrp_elements[0].remove(file_elements[0])
-
+        filegrp_elements[0].append(new_file)
+        
         ET.indent(tree, space='    ', level=0)
         tree.write(directory / 'METS.xml', encoding='utf-8', xml_declaration=True)
         print("METS written in:", directory)

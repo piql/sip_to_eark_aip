@@ -383,7 +383,7 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
                                                     'ID': new_id,
                                                     'MIMETYPE': str(mimetypes.guess_type(preservation_mets_path)[0]),
                                                     'SIZE': str(preservation_mets_path.stat().st_size),
-                                                    'CREATED': str(preservation_mets_path.stat().st_ctime),
+                                                    'CREATED': created_now,
                                                     'CHECKSUM': get_checksum(preservation_mets_path),
                                                     'CHECKSUMTYPE' : "SHA-256"
                                                 })
