@@ -108,7 +108,7 @@ def new_uuid():
 
 
 def new_id():
-    return 'ID' + str(uuid.uuid4())
+    return 'ID-' + str(uuid.uuid4())
 
 
 def update_all_mets_ids(mets_tree, id_updates, namespaces):
@@ -287,7 +287,7 @@ def get_preservation_reps_name(rep):
     return rep_name + rep_num
 
 
-def create_aip_root_mets(sip_mets, aip_root, id_updates):
+def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
     """
     The structure of the SIP and AIP are similar so it is possible to alter the SIP METS.xml
     This method maintains namespaces with the original SIP mets and uses it as a template. The necessary adjustments are
@@ -354,55 +354,47 @@ def create_aip_root_mets(sip_mets, aip_root, id_updates):
     filesec_element.append(new_filegrp)
 
     # EACH FILE GROUP
-    for fileGrp in filesec_element.findall('{%s}fileGrp' % namespaces['']):
-        if fileGrp.attrib['USE'].lower().startswith('representations'):
+    for fileGrp_element in filesec_element.findall('{%s}fileGrp' % namespaces['']):
+        # Convert SIP representations to preservation represnetations
+        if fileGrp_element.attrib['USE'].lower().startswith('representations'):
 
-            rep_use = fileGrp.attrib['USE']
-            rep_parts = Path(rep_use).parts
+            rep_use = Path(fileGrp_element.attrib['USE'])
+            rep_parts = rep_use.parts
 
-            id_updates[fileGrp.attrib['ID']] = fileGrp.attrib['ID'] = new_uuid()
-            fileGrp.attrib['USE'] = 'Representations'
+            id_updates[fileGrp_element.attrib['ID']] = fileGrp_element.attrib['ID'] = new_uuid()
 
-            if len(rep_parts) == 1:  # 'Representations'
-                sub_filegrp = fileGrp.find('{%s}fileGrp' % namespaces[''])
-                rep_name = sub_filegrp.attrib['USE'] = get_preservation_reps_name(sub_filegrp.attrib['USE'])
-                sub_filegrp.attrib['ID'] = new_uuid()
-            elif len(rep_parts) == 2:  # 'Representations/repx'
-                new_filegrp = ET.Element('{%s}fileGrp' % namespaces[''], attrib={'ID': new_uuid()})
-                rep_name = new_filegrp.attrib['USE'] = get_preservation_reps_name(rep_parts[1])
-                old_file = fileGrp.find('{%s}file' % namespaces[''])
-                fileGrp.remove(old_file)
-                new_filegrp.append(old_file)
-                fileGrp.append(new_filegrp)
-
-            else:
-                print('ERROR in METS.xml representations structure')
-                sys.exit(1)
-
-            sub_filegrp = fileGrp.find('{%s}fileGrp' % namespaces[''])
-            file_elements = sub_filegrp.findall('{%s}file' % namespaces[''])
-
-            preservation_rep_path = "{}/{}".format('representations', rep_name)
-            preservation_mets = aip_root / preservation_rep_path / 'METS.xml'
-            if preservation_mets.exists():
-                if len(file_elements) == 1:
-                    file = file_elements[0]
-                    flocat = file.find('{%s}FLocat' % namespaces[''])
-                    if file.attrib['MIMETYPE'] == 'text/xml' and str(
-                            flocat.attrib['{%s}href' % namespaces['xlink']]).endswith('METS.xml'):
-                        file.attrib['MIMETYPE'] = str(mimetypes.guess_type(preservation_mets)[0])
-                        file.attrib['SIZE'] = str(preservation_mets.stat().st_size)
-                        file.attrib['CREATED'] = created_now
-                        file.attrib['CHECKSUM'] = get_checksum(preservation_mets)
-                        file.attrib['CHECKSUMTYPE'] = 'SHA-256'
-                        flocat.attrib['{%s}href' % namespaces['xlink']] = preservation_rep_path + '/METS.xml'
-                else:
-                    print("Incorrect count of files in SIP representations fileGrp. Found:", len(file_elements),
-                          '. Expected: 1')
-                    sys.exit(1)
-            else:
-                print('ERROR: Expected Preservation METS.xml')
-                sys.exit(1)
+            if len(rep_parts) == 1:     # Representations
+                """
+                for sub_fileGrp_element in fileGrp_element.findall('{%s}' % namespaces['']):
+                    fileGrp_element.remove(sub_fileGrp_element)
+                """
+                print("Weird Representations")
+            elif len(rep_parts) == 2:   # Representations/rep1
+                preservation_rep_name = rep_parts[0] + '/' + get_preservation_reps_name(rep_parts[1])
+                fileGrp_element.attrib['USE'] = preservation_rep_name
+                for file_element in fileGrp_element.findall('{%s}file' % namespaces['']):
+                    fileGrp_element.remove(file_element)
+                
+                preservation_mets_path: Path = aip_root / preservation_rep_name / 'METS.xml'
+                
+                if preservation_mets_path.exists():
+                    new_file_element = ET.Element('{%s}file' % namespaces[''], 
+                                                attrib={
+                                                    'ID': new_id,
+                                                    'MIMETYPE': str(mimetypes.guess_type(preservation_mets_path)[0]),
+                                                    'SIZE': str(preservation_mets_path.stat().st_size),
+                                                    'CREATED': str(preservation_mets_path.stat().st_ctime),
+                                                    'CHECKSUM': get_checksum(preservation_mets_path),
+                                                    'CHECKSUMTYPE' : "SHA-256"
+                                                })
+                    new_FLocat_element = ET.Element('{%s}FLocat' % namespaces[''],
+                                                    attrib={
+                                                        '{%s}type' % namespaces['xlink']: 'simple',
+                                                        '{%s}href' % namespaces['xlink']: preservation_rep_name + '/' + 'METS.xml',
+                                                        'LOCTYPE': 'URL',
+                                                    })
+                    new_file_element.append(new_FLocat_element)
+                    fileGrp_element.append(new_file_element)
 
     # STRUCT MAP
     structmap_element = root.find('{%s}structMap' % namespaces[''])
@@ -432,12 +424,10 @@ def create_aip_root_mets(sip_mets, aip_root, id_updates):
                 div.append(new_sub_div)
 
                 item = div.find('{%s}mptr' % namespaces[''])
+                item.attrib['{%s}href' % namespaces['xlink']] = preservation_rep_path + '/METS.xml'
                 div.remove(item)
                 new_sub_div.append(item)
 
-                for pointer in div:
-                    if str(pointer.tag) == '{%s}mptr' % namespaces['']:
-                        pointer.attrib['{%s}href' % namespaces['xlink']] = preservation_rep_path + '/METS.xml'
         if div.attrib['LABEL'].lower() == 'submission':
             root_div_element.remove(div)
 
