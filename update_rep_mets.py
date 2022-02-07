@@ -132,7 +132,7 @@ def update_root_mets(directory):
                     file_element = fileGrp_element.find('{%s}file' % namespaces[''])
                     flocat_element = file_element.find('{%s}FLocat' % namespaces[''])
                     href = flocat_element.get('{%s}href' % namespaces['xlink'])
-                    file_path = directory / href
+                    file_path = directory / href.lower()
                     file_element.set('SIZE', str(file_path.stat().st_size))
                     file_element.set('CREATED', datetime.fromtimestamp(file_path.stat().st_ctime).strftime("%Y-%m-%dT%H:%M:%S%z"))
                     file_element.set('CHECKSUM', get_checksum(file_path))
