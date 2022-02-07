@@ -133,10 +133,13 @@ def update_root_mets(directory):
                     flocat_element = file_element.find('{%s}FLocat' % namespaces[''])
                     href = flocat_element.get('{%s}href' % namespaces['xlink'])
                     file_path = directory / href
-                    file_element.set('SIZE', file_path.stat().st_size)
-                    file_element.set('CREATED', file_path.stat().st_ctime)
+                    file_element.set('SIZE', str(file_path.stat().st_size))
+                    file_element.set('CREATED', datetime.fromtimestamp(file_path.stat().st_ctime).strftime("%Y-%m-%dT%H:%M:%S%z"))
                     file_element.set('CHECKSUM', get_checksum(file_path))
                     file_element.set('CHECKSUMTYPE', 'SHA-256')
+        ET.indent(tree, space='    ', level=0)
+        tree.write(directory / 'METS.xml', encoding='utf-8', xml_declaration=True)
+        print("METS written in:", directory)
 
 
 if __name__ == '__main__':
