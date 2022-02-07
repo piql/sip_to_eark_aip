@@ -417,7 +417,7 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
                 rep_name = rep_parts[1].rstrip('0123456789')
                 rep_number = "{:02}.1".format(int(rep_parts[1][len(rep_name):]))
                 preservation_rep_path = "{}/{}{}".format('representations', rep_name, rep_number)
-                div.attrib['LABEL'] = 'Representation'
+                div.attrib['LABEL'] = 'Representations'
 
                 new_sub_div = ET.Element('{%s}div' % namespaces[''], attrib={'ID': '', 'LABEL': rep_name + rep_number})
                 div.append(new_sub_div)
