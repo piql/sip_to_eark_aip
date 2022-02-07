@@ -375,12 +375,11 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
                 for file_element in fileGrp_element.findall('{%s}file' % namespaces['']):
                     fileGrp_element.remove(file_element)
                 
-                preservation_mets_path: Path = aip_root / preservation_rep_name / 'METS.xml'
-                
+                preservation_mets_path: Path = aip_root / preservation_rep_name.lower() / 'METS.xml'
                 if preservation_mets_path.exists():
                     new_file_element = ET.Element('{%s}file' % namespaces[''], 
                                                 attrib={
-                                                    'ID': new_id,
+                                                    'ID': new_id(),
                                                     'MIMETYPE': str(mimetypes.guess_type(preservation_mets_path)[0]),
                                                     'SIZE': str(preservation_mets_path.stat().st_size),
                                                     'CREATED': created_now,
