@@ -46,7 +46,7 @@ def get_checksum(file):
             sha256_hash.update(byte_block)
         return sha256_hash.hexdigest()
 
-def update_mets(directory):
+def update_rep_mets(directory):
     expected_mets_path = directory / "METS.xml"
     if expected_mets_path.exists() and expected_mets_path.is_file():
         namespaces = get_namespaces(expected_mets_path)
@@ -115,10 +115,36 @@ def update_mets(directory):
         print("Error: METS.xml not found in directory:", expected_mets_path)
         sys.exit(1)
 
+def update_root_mets(directory):
+    expected_mets_path = directory / "METS.xml"
+    if expected_mets_path.exists() and expected_mets_path.is_file():
+        namespaces = get_namespaces(expected_mets_path)
+        tree = ET.parse(expected_mets_path)
+        root = tree.getroot()
+        fileSec_element = root.find('{%s}fileSec' % namespaces[''])
+        for fileGrp_element in fileSec_element.findall('{%s}fileGrp' % namespaces['']):
+            fileGrp_use = fileGrp_element.get('USE')
+            if fileGrp_use.lower().startswith('representations'):
+                use_parts = fileGrp_use.split('/')
+                if len(use_parts) == 1:
+                    pass
+                elif len(use_parts) == 2:
+                    file_element = fileGrp_element.find('{%s}file' % namespaces[''])
+                    flocat_element = file_element.find('{%s}FLocat' % namespaces[''])
+                    href = flocat_element.get('{%s}href' % namespaces['xlink'])
+                    file_path = directory / href
+                    file_element.set('SIZE', file_path.stat().st_size)
+                    file_element.set('CREATED', file_path.stat().st_ctime)
+                    file_element.set('CHECKSUM', get_checksum(file_path))
+                    file_element.set('CHECKSUMTYPE', 'SHA-256')
+
+
 if __name__ == '__main__':
     if len(sys.argv) == 2:
-        if validate_directories(Path(get_arg(1))):
-            update_mets(Path(get_arg(1)))
+        rep_dir = Path(sys.argv[1])
+        if validate_directories(rep_dir):
+            update_rep_mets(rep_dir)
+            update_root_mets(rep_dir.parents[1])
         else:
             sys.exit(1)
     else:
