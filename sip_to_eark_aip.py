@@ -370,8 +370,8 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
                 """
                 print("Weird Representations")
             elif len(rep_parts) == 2:   # Representations/rep1
-                preservation_rep_name = rep_parts[0] + '/' + get_preservation_reps_name(rep_parts[1])
-                fileGrp_element.attrib['USE'] = preservation_rep_name
+                preservation_rep_name = rep_parts[0].lower() + '/' + get_preservation_reps_name(rep_parts[1])
+                fileGrp_element.attrib['USE'] = preservation_rep_name.capitalize()
                 for file_element in fileGrp_element.findall('{%s}file' % namespaces['']):
                     fileGrp_element.remove(file_element)
                 
