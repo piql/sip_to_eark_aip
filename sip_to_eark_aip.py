@@ -336,7 +336,8 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
     filesec_element = root.find('{%s}fileSec' % namespaces[''])
 
     # NEW SUBMISSION GROUP + FILES
-    submission_mets = aip_root / 'submission' / 'METS.xml'
+    relative_mets = 'submission/submission-' + str(datetime.now().strftime("%Y-%m-%d")) +'/METS.xml'
+    submission_mets = aip_root / relative_mets
     new_sub_id = new_uuid()
     new_filegrp = ET.Element('{%s}fileGrp' % namespaces[''], attrib={'ID': new_sub_id, 'USE': 'Submission'})
 
@@ -347,7 +348,7 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
 
     new_flocat = ET.Element('{%s}FLocat' % namespaces[''],
                             attrib={'{%s}type' % namespaces['xlink']: 'simple',
-                                    '{%s}href' % namespaces['xlink']: 'submission/METS.xml', 'LOCTYPE': 'URL'})
+                                    '{%s}href' % namespaces['xlink']: relative_mets, 'LOCTYPE': 'URL'})
 
     new_file.append(new_flocat)
     new_filegrp.append(new_file)
@@ -419,7 +420,7 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
                 preservation_rep_path = "{}/{}{}".format('representations', rep_name, rep_number)
                 div.attrib['LABEL'] = 'Representations'
 
-                new_sub_div = ET.Element('{%s}div' % namespaces[''], attrib={'ID': '', 'LABEL': rep_name + rep_number})
+                new_sub_div = ET.Element('{%s}div' % namespaces[''], attrib={'ID': '', 'LABEL': rep_name.capitalize() + rep_number})
                 div.append(new_sub_div)
 
                 item = div.find('{%s}mptr' % namespaces[''])
@@ -459,11 +460,11 @@ def copy_sip_to_aip(sip_path, aip_path):
     # copy required items in to submissions and copy in to AIP root if required
     items_to_copy = {'representations': False, 'metadata': True, 'schemas': True, 'documentation': True,
                      'METS.xml': False}
-    aip_submission_path = aip_path / "submission"
+    aip_submission_path = aip_path / "submission" / ('submission-' + str(datetime.now().strftime("%Y-%m-%d")))
     expected_sip_reps_path = sip_path / 'representations'
     if expected_sip_reps_path.is_dir():
         if validate_representations_sequence(expected_sip_reps_path):
-            aip_submission_path.mkdir()
+            aip_submission_path.mkdir(parents=True)
             for item in items_to_copy.keys():
                 item_path = sip_path / item
                 destination_path = aip_submission_path / item
@@ -491,7 +492,7 @@ def create_aip_representations(aip_path):
     Create preservation directories to store archivematica transfer
     :param Path aip_path: path to AIP root
     """
-    aip_submission_representations_path = aip_path / 'submission' / "representations"
+    aip_submission_representations_path = aip_path / 'submission' / ('submission-' + str(datetime.now().strftime("%Y-%m-%d"))) / "representations"
 
     for rep in sorted(aip_submission_representations_path.iterdir()):
         rep = rep.stem
