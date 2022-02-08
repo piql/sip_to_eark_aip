@@ -149,6 +149,7 @@ if __name__ == '__main__':
             update_rep_mets(rep_dir)
             update_root_mets(rep_dir.parents[1])
         else:
+            print("invalid dir")
             sys.exit(1)
     else:
         print("Error: Command should have the form:")
