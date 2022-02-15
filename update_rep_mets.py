@@ -132,7 +132,7 @@ def update_root_mets(directory):
                     file_element = fileGrp_element.find('{%s}file' % namespaces[''])
                     flocat_element = file_element.find('{%s}FLocat' % namespaces[''])
                     href = flocat_element.get('{%s}href' % namespaces['xlink'])
-                    file_path = directory / href.lower()
+                    file_path = directory / href
                     file_element.set('SIZE', str(file_path.stat().st_size))
                     file_element.set('CREATED', datetime.fromtimestamp(file_path.stat().st_ctime).strftime("%Y-%m-%dT%H:%M:%S%z"))
                     file_element.set('CHECKSUM', get_checksum(file_path))
@@ -146,7 +146,9 @@ if __name__ == '__main__':
     if len(sys.argv) == 2:
         rep_dir = Path(sys.argv[1])
         if validate_directories(rep_dir):
+            print('Updating rep mets:', rep_dir)
             update_rep_mets(rep_dir)
+            print('Updating root mets:', rep_dir.parents[1])
             update_root_mets(rep_dir.parents[1])
         else:
             print("invalid dir")
