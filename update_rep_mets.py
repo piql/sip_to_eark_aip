@@ -138,7 +138,8 @@ def update_root_mets(directory):
                     file_element.set('CHECKSUM', get_checksum(file_path))
                     file_element.set('CHECKSUMTYPE', 'SHA-256')
             elif fileGrp_use.lower() == 'submission':
-                fileGrp_use = Path(fileGrp_element.find('{%s}file' % namespaces['']).find('{%s}FLocat' % namespaces['']).get('{%s}href' % namespaces['xlink'])).parent
+                fileGrp_element.set('USE', str(Path(fileGrp_element.find('{%s}file' % namespaces['']).find('{%s}FLocat' % namespaces['']).get('{%s}href' % namespaces['xlink'])).parent))
+                print('use:', fileGrp_use)
 
         ET.indent(tree, space='    ', level=0)
         tree.write(directory / 'METS.xml', encoding='utf-8', xml_declaration=True)
