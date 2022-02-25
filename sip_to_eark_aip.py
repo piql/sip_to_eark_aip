@@ -1,11 +1,9 @@
 import hashlib
 import mimetypes
-import os
 import shutil
 import sys
 import time
 import uuid
-import metsrw
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
@@ -510,7 +508,7 @@ def create_aip_representations(aip_path):
 
 def transform_sip_to_aip(sip_path, aip_path):
     # Make False for testing to prevent giving aip new uuid and save space
-    if False:
+    if True:
         sip_name = sip_path.stem
         sip_uuid = sip_name[sip_name.index('uuid'):]
         package_name = sip_name[:sip_name.index('uuid')]
@@ -546,58 +544,6 @@ def transform_sip_to_aip(sip_path, aip_path):
 
     # TODO:
     #  - Transfer archivematica AIP into preservation
-
-
-def create_mets(path):
-    """
-    Creates METS.xml on directory and writes to directory root
-    :param Path path: path to information package to create mets on
-    """
-    mets = metsrw.METSDocument()
-    mets.append(create_fse(path, path))
-    mets.write(str(path / "METS.xml"), pretty_print=True)
-    print("METS written in: %s" % path)
-
-
-def create_fse(current_path, aip_root_path):
-    """
-    Recursive call for creating metsrw.FSEntry tree to be written to METS
-    :param Path current_path: keeps track of current directory
-    :param Path aip_root_path: path to the AIP root
-    :return FSEntry fse: completed tree of directory
-    """
-    base_directory = current_path.stem
-    fse = metsrw.FSEntry(label=base_directory, type="Directory", file_uuid=str(uuid.uuid4()))
-    relative_path = current_path.relative_to(aip_root_path)
-    try:
-        fse_use = relative_path.parts[0]
-    except IndexError:
-        fse_use = 'original'
-    else:
-        if len(relative_path.parts) > 1 and relative_path.parts[0].lower == 'representations':
-            fse_use = '{}/{}'.format(relative_path.parts[0], relative_path.parts[1])
-
-    if "METS.xml" in os.listdir(current_path):
-        print("METS found: %s" % current_path)
-        mets_path = str(current_path / 'METS.xml')
-        file_fse = metsrw.FSEntry(use=fse_use, label="METS.xml",
-                                  path=str(relative_path / "METS.xml"), type="Item",
-                                  file_uuid=str(uuid.uuid4()), checksum=get_checksum(mets_path), checksumtype='SHA-256')
-        fse.children.append(file_fse)
-        return fse
-
-    for item in os.listdir(current_path):
-        item_path = current_path / item
-        if item_path.is_dir():
-            fse.children.append(create_fse(item_path, aip_root_path))
-        elif item_path.is_file():
-            file_fse = metsrw.FSEntry(use=fse_use, label=item, path=str(relative_path / item), type="Item",
-                                      file_uuid=str(uuid.uuid4()), checksum=get_checksum(item_path),
-                                      checksumtype='SHA-256')
-            fse.children.append(file_fse)
-        else:
-            print("File Error - create_root_mets()")
-    return fse
 
 
 if __name__ == '__main__':
