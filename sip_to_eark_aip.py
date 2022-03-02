@@ -2,7 +2,6 @@ import hashlib
 import mimetypes
 import shutil
 import sys
-import time
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime
@@ -269,7 +268,6 @@ def create_aip_rep_mets(sip_rep_mets, rep_root):
 
     ET.indent(tree, space='    ', level=0)
     tree.write(rep_root / 'METS.xml', encoding='utf-8', xml_declaration=True)
-    print("METS written in:", rep_root)
 
 
 def get_preservation_reps_name(rep):
@@ -542,6 +540,8 @@ def transform_sip_to_aip(sip_path, aip_path):
 
     create_aip_root_mets(sip_mets, aip_path, id_updates)
 
+    print(aip_name)
+
     # TODO:
     #  - Transfer archivematica AIP into preservation
 
@@ -549,9 +549,7 @@ def transform_sip_to_aip(sip_path, aip_path):
 if __name__ == '__main__':
     if len(sys.argv) == 3:
         if validate_directories(Path(get_arg(1)), Path(get_arg(2))):
-            start = time.time()
             transform_sip_to_aip(Path(get_arg(1)), Path(get_arg(2)))
-            print('It took', time.time() - start, 'seconds.')
         else:
             sys.exit(1)
     else:
