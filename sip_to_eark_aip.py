@@ -44,6 +44,7 @@ def validate_directories(sip_dir, output_dir):
                             pass
                     except ValueError:
                         print("Error: SIP doesn't contain valid uuid4")
+                        sys.exit(2)
                     else:
                         return True
                 else:
@@ -63,7 +64,7 @@ def overwrite_and_create_directory(directory):
     :param Path directory: path that needs to be (re)created
     """
     if directory.is_dir():
-        print("Overwriting '%s'" % directory)
+        # print("Overwriting '%s'" % directory)
         shutil.rmtree(directory)
     directory.mkdir(parents=True, exist_ok=False)
 
@@ -145,13 +146,10 @@ def update_all_mets_ids(mets_tree, id_updates, namespaces):
     for div in root_div_element.findall('{%s}div' % namespaces['']):
         div.attrib['ID'] = new_uuid()
         if div.attrib['LABEL'].lower() == 'metadata':
-            try:
-                if div.attrib['DMDID'] in id_updates:
-                    div.attrib['DMDID'] = id_updates[div.attrib['DMDID']]
-                else:
-                    div.attrib['DMDID'] = new_uuid()
-            except KeyError:
-                print("Warning: Expecting 'DMDID' in structmap metadata")
+            if div.attrib['DMDID'] in id_updates:
+                div.attrib['DMDID'] = id_updates[div.attrib['DMDID']]
+            else:
+                div.attrib['DMDID'] = new_uuid()
         div_subdivs = div.findall('{%s}div' % namespaces[''])
         if div_subdivs:
             for sub_div in div_subdivs:
@@ -172,9 +170,6 @@ def update_all_mets_ids(mets_tree, id_updates, namespaces):
                                 item.attrib['{%s}title' % namespaces['xlink']] = new_uuid()
                         except KeyError:
                             pass
-                    else:
-                        print('Warning: Got unsupported pointer:', item.attrib['LABEL'], item.tag,
-                              "while updating mets ID")
         else:
             for item in div:
                 if str(item.tag) == '{%s}fptr' % namespaces['']:
@@ -191,8 +186,6 @@ def update_all_mets_ids(mets_tree, id_updates, namespaces):
                             item.attrib['{%s}title' % namespaces['xlink']] = new_uuid()
                     except KeyError:
                         pass
-                else:
-                    print('Warning: Got unsupported pointer:', item.attrib['LABEL'], item.tag, "while updating mets ID")
 
 
 def get_namespaces(mets_file):
@@ -225,6 +218,7 @@ def create_aip_rep_mets(sip_rep_mets, rep_root):
         metshdr_elemet.attrib['{%s}OAISPACKAGETYPE' % namespaces['csip']] = 'AIP'
     except KeyError:
         print("Warning: metsHdr doesn't containt OAISPACKAGETYPE as 'csip' is not in namespaces")
+        sys.exit(2)
 
     # FILE SECTION
     filesec_element = root.find('{%s}fileSec' % namespaces[''])
@@ -308,6 +302,7 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
         metshdr_elemet.attrib['{%s}OAISPACKAGETYPE' % namespaces['csip']] = 'AIP'
     except KeyError:
         print("Warning: metsHdr doesn't contain OAISPACKAGETYPE")
+        sys.exit(2)
 
 
     # DMD SEC
@@ -315,12 +310,13 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
     try:
         dmdsec_element = root.find('{%s}dmdSec' % namespaces[''])
     except KeyError:
-        print('No dmd sec found')
+        pass
     else:
         try:
             mdref_element = dmdsec_element.find('{%s}mdRef' % namespaces[''])
         except KeyError:
             print('No mdRef found in dmdSec')
+            sys.exit(2)
         else:
             href = Path(mdref_element.attrib['{%s}href' % namespaces['xlink']])
             metadata_location = aip_root / href
@@ -365,7 +361,8 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
                 for sub_fileGrp_element in fileGrp_element.findall('{%s}' % namespaces['']):
                     fileGrp_element.remove(sub_fileGrp_element)
                 """
-                print("Weird Representations")
+                print("Unsupported repesentations structure")
+                sys.exit(2)
             elif len(rep_parts) == 2:   # Representations/rep1
                 preservation_rep_name = rep_parts[0].lower() + '/' + get_preservation_reps_name(rep_parts[1])
                 fileGrp_element.attrib['USE'] = preservation_rep_name.capitalize()
@@ -444,7 +441,6 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
 
     ET.indent(tree, space='    ', level=0)
     tree.write(aip_root / 'METS.xml', encoding='utf-8', xml_declaration=True)
-    print("METS written in:", aip_root)
 
 
 def copy_sip_to_aip(sip_path, aip_path):
@@ -472,8 +468,6 @@ def copy_sip_to_aip(sip_path, aip_path):
                 elif item_path.is_file():
                     # Will be METS.xml
                     shutil.copy2(item_path, destination_path)
-                else:
-                    print("%s not found" % item)
         else:
             print("Exiting.")
             sys.exit(1)
