@@ -38,7 +38,12 @@ def validate_directories(sip_dir, output_dir):
                 if output_dir.is_dir():
                     sip_name = sip_dir.stem
                     try:
-                        sip_uuid = str(sip_name[sip_name.index('uuid-') + len('uuid-'):])
+                        sip_uuid = sip_name
+                        if 'uuid-' in sip_name:
+                            sip_uuid = sip_name[sip_name.index('uuid-') + len('uuid-'):]
+
+                        # sip_uuid = str(sip_name[sip_name.index('uuid-') + len('uuid-'):])
+                        # sip_uuid = str(sip_name[sip_name.index('uuid-') + len('uuid-'):])
                         uuid_obj = uuid.UUID(sip_uuid, version=4)
                         if sip_uuid == str(uuid_obj):
                             pass
@@ -68,7 +73,7 @@ def overwrite_and_create_directory(directory):
         shutil.rmtree(directory)
     directory.mkdir(parents=True, exist_ok=False)
 
-
+'''
 def validate_representations_sequence(representations_path):
     """
     Validate SIP representations naming and sequence structure
@@ -99,7 +104,7 @@ def validate_representations_sequence(representations_path):
             print("ERROR in SIP rep number sequence. Expected:", expected_sequence_number, "Got:", sequence_number)
             return False
     return True
-
+'''
 
 def new_uuid():
     return 'uuid-' + str(uuid.uuid4())
@@ -455,22 +460,22 @@ def copy_sip_to_aip(sip_path, aip_path):
     aip_submission_path = aip_path / "submission" / ('submission-' + str(datetime.now().strftime("%Y-%m-%d")))
     expected_sip_reps_path = sip_path / 'representations'
     if expected_sip_reps_path.is_dir():
-        if validate_representations_sequence(expected_sip_reps_path):
-            aip_submission_path.mkdir(parents=True)
-            for item in items_to_copy.keys():
-                item_path = sip_path / item
-                destination_path = aip_submission_path / item
-                if item_path.is_dir():
-                    shutil.copytree(item_path, destination_path)
-                    # if True, also copy item into aip root
-                    if items_to_copy[item]:
-                        shutil.copytree(item_path, aip_path / item)
-                elif item_path.is_file():
-                    # Will be METS.xml
-                    shutil.copy2(item_path, destination_path)
-        else:
-            print("Exiting.")
-            sys.exit(1)
+        # if validate_representations_sequence(expected_sip_reps_path):
+        aip_submission_path.mkdir(parents=True)
+        for item in items_to_copy.keys():
+            item_path = sip_path / item
+            destination_path = aip_submission_path / item
+            if item_path.is_dir():
+                shutil.copytree(item_path, destination_path)
+                # if True, also copy item into aip root
+                if items_to_copy[item]:
+                    shutil.copytree(item_path, aip_path / item)
+            elif item_path.is_file():
+                # Will be METS.xml
+                shutil.copy2(item_path, destination_path)
+        #else:
+        #    print("Exiting.")
+        #    sys.exit(1)
     else:
         print("Error: SIP representations directory not found")
         print("Exiting.")
@@ -497,13 +502,31 @@ def create_aip_representations(aip_path):
 
         create_aip_rep_mets(aip_submission_representations_path / rep / 'METS.xml', preservation_rep_path)
 
+def get_uuid_from_string(filename):
+    try:
+        the_uuid = filename
+        accepted_prefixs = ['uuid-']
+        for prefix in accepted_prefixs:
+            if prefix in filename:
+                the_uuid = filename[filename.index(prefix) + len(prefix)]
+                break
+        uuid_obj = uuid.UUID(the_uuid, version=4)
+        if the_uuid == str(uuid_obj):
+            pass
+    except ValueError:
+        print("Error: " + filename + " doesn't contain valid uuid4")
+        sys.exit(2)
+    return the_uuid
+
 
 def transform_sip_to_aip(sip_path, aip_path):
     # Make False for testing to prevent giving aip new uuid and save space
     if True:
         sip_name = sip_path.stem
-        sip_uuid = sip_name[sip_name.index('uuid'):]
-        package_name = sip_name[:sip_name.index('uuid')]
+        sip_uuid = get_uuid_from_string(sip_name)
+        # sip_uuid = sip_name[sip_name.index('uuid'):]
+        # package_name = sip_name[:sip_name.index('uuid')]
+        package_name = sip_name[:-len(sip_uuid)]
         aip_uuid = new_uuid()
         aip_name = package_name + aip_uuid
         aip_path = aip_path / aip_name
