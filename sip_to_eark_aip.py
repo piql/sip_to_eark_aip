@@ -1,8 +1,6 @@
-from cmath import log
 import hashlib
 import logging
 import mimetypes
-from msilib.schema import Directory
 import shutil
 import sys
 import uuid
@@ -499,18 +497,23 @@ def create_aip_representations(aip_path):
     """
     aip_submission_representations_path = aip_path / 'submission' / ('submission-' + str(datetime.now().strftime("%Y-%m-%d"))) / "representations"
 
+    rep_i = 0
     for rep in sorted(aip_submission_representations_path.iterdir()):
+        '''
         rep = rep.stem
         rep_name = rep.rstrip('0123456789')
         rep_number = int(rep[len(rep_name):])
+        '''
 
         # make preservation directory : rep1 -> rep01.1
-        preservation_rep_path = aip_path / "representations" / "{}{:02}.1".format('rep', rep_number)
+        preservation_rep_path = aip_path / "representations" / "{}{:02}.1".format('rep', rep_i)
         (preservation_rep_path / "data").mkdir(parents=True)
         with open(preservation_rep_path / 'data' / 'TestAMTransfer.txt', 'w') as f:
             f.write("Just some random text")
 
-        create_aip_rep_mets(aip_submission_representations_path / rep / 'METS.xml', preservation_rep_path)
+        create_aip_rep_mets(rep / 'METS.xml', preservation_rep_path)
+
+        rep_i += 1
 
 
 def get_uuid_from_string(filename):
