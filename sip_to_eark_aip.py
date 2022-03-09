@@ -1,5 +1,8 @@
+from cmath import log
 import hashlib
+import logging
 import mimetypes
+from msilib.schema import Directory
 import shutil
 import sys
 import uuid
@@ -48,18 +51,22 @@ def validate_directories(sip_dir, output_dir):
                         if sip_uuid == str(uuid_obj):
                             pass
                     except ValueError:
-                        print("Error: SIP doesn't contain valid uuid4")
+                        logging.error("SIP does not contain valid uuid4")
+                        # print("Error: SIP doesn't contain valid uuid4")
                         sys.exit(2)
                     else:
                         return True
                 else:
-                    print("Error: Output is not a directory")
+                    logging.error("Output is not a directory")
+                    # print("Error: Output is not a directory")
             else:
                 return True
         else:
-            print("Error: Input is not a directory")
+            logging.error("Input is not a directory")
+            # print("Error: Input is not a directory")
     else:
-        print("Error: Input directory doesn't exist")
+        logging.error("Input Directory doesn't exist")
+        # print("Error: Input directory doesn't exist")
     return False
 
 
@@ -69,7 +76,7 @@ def overwrite_and_create_directory(directory):
     :param Path directory: path that needs to be (re)created
     """
     if directory.is_dir():
-        # print("Overwriting '%s'" % directory)
+        logging.info("Overwriting '%s'" % directory)
         shutil.rmtree(directory)
     directory.mkdir(parents=True, exist_ok=False)
 
@@ -222,7 +229,8 @@ def create_aip_rep_mets(sip_rep_mets, rep_root):
     try:
         metshdr_elemet.attrib['{%s}OAISPACKAGETYPE' % namespaces['csip']] = 'AIP'
     except KeyError:
-        print("Warning: metsHdr doesn't containt OAISPACKAGETYPE as 'csip' is not in namespaces")
+        logging.error("metsHdr doesn't containt OAISPACKAGETYPE as 'csip' is not in namespaces")
+        # print("Warning: metsHdr doesn't containt OAISPACKAGETYPE as 'csip' is not in namespaces")
         sys.exit(2)
 
     # FILE SECTION
@@ -277,8 +285,9 @@ def get_preservation_reps_name(rep):
     try:
         rep_num = "{:02}.1".format(int(rep[len(rep_name):]))
     except ValueError:
-        print('ERROR in METS.xml representations structure')
-        sys.exit(1)
+        logging.error("Bad METS.xml representations structure")
+        # print('ERROR in METS.xml representations structure')
+        sys.exit(2)
     return rep_name + rep_num
 
 
@@ -309,7 +318,6 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
         print("Warning: metsHdr doesn't contain OAISPACKAGETYPE")
         sys.exit(2)
 
-
     # DMD SEC
     # Expected SHA-256 checksum
     try:
@@ -320,7 +328,8 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
         try:
             mdref_element = dmdsec_element.find('{%s}mdRef' % namespaces[''])
         except KeyError:
-            print('No mdRef found in dmdSec')
+            logging.error("No mdRef found in dmdSec")
+            # print('No mdRef found in dmdSec')
             sys.exit(2)
         else:
             href = Path(mdref_element.attrib['{%s}href' % namespaces['xlink']])
@@ -366,7 +375,8 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
                 for sub_fileGrp_element in fileGrp_element.findall('{%s}' % namespaces['']):
                     fileGrp_element.remove(sub_fileGrp_element)
                 """
-                print("Unsupported repesentations structure")
+                logging.error("Unsupported representations structure")
+                # print("Unsupported repesentations structure")
                 sys.exit(2)
             elif len(rep_parts) == 2:   # Representations/rep1
                 preservation_rep_name = rep_parts[0].lower() + '/' + get_preservation_reps_name(rep_parts[1])
@@ -502,6 +512,7 @@ def create_aip_representations(aip_path):
 
         create_aip_rep_mets(aip_submission_representations_path / rep / 'METS.xml', preservation_rep_path)
 
+
 def get_uuid_from_string(filename):
     try:
         the_uuid = filename
@@ -514,7 +525,8 @@ def get_uuid_from_string(filename):
         if the_uuid == str(uuid_obj):
             pass
     except ValueError:
-        print("Error: " + filename + " doesn't contain valid uuid4")
+        logging.error(filename + " doesn't contain valid uuid4")
+        # print("Error: " + filename + " doesn't contain valid uuid4")
         sys.exit(2)
     return the_uuid
 
@@ -559,17 +571,21 @@ def transform_sip_to_aip(sip_path, aip_path):
 
     print(aip_name)
 
+    logging.info("Finished transforming SIP: " + sip_name + " into AIP: " + aip_name)
+
     # TODO:
     #  - Transfer archivematica AIP into preservation
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG, filemode='a', filename='log.log', format='%(asctime)s %(levelname)s: %(message)s')
     if len(sys.argv) == 3:
         if validate_directories(Path(get_arg(1)), Path(get_arg(2))):
             transform_sip_to_aip(Path(get_arg(1)), Path(get_arg(2)))
         else:
             sys.exit(1)
     else:
+        logging.error("Incorrect script call format")
         print("Error: Command should have the form:")
-        print("python main.py <SIP Directory> <Output Directory>")
+        print("python aip_to_eark_aip.py <SIP Directory> <Output Directory>")
         sys.exit(1)
