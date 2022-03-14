@@ -357,7 +357,8 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
     new_file.append(new_flocat)
     new_filegrp.append(new_file)
     filesec_element.append(new_filegrp)
-
+    
+    preservation_rep_i = 1
     # EACH FILE GROUP
     for fileGrp_element in filesec_element.findall('{%s}fileGrp' % namespaces['']):
         # Convert SIP representations to preservation represnetations
@@ -369,15 +370,14 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
             id_updates[fileGrp_element.attrib['ID']] = fileGrp_element.attrib['ID'] = new_uuid()
 
             if len(rep_parts) == 1:     # Representations
-                """
-                for sub_fileGrp_element in fileGrp_element.findall('{%s}' % namespaces['']):
-                    fileGrp_element.remove(sub_fileGrp_element)
-                """
                 logging.error("Unsupported representations structure")
                 # print("Unsupported repesentations structure")
                 sys.exit(2)
             elif len(rep_parts) == 2:   # Representations/rep1
-                preservation_rep_name = rep_parts[0].lower() + '/' + get_preservation_reps_name(rep_parts[1])
+                # preservation_rep_name = rep_parts[0].lower() + '/' + get_preservation_reps_name(rep_parts[1])
+                preservation_rep_num = "{:02}.1".format(preservation_rep_i)
+                preservation_rep_name = rep_parts[0].lower() + '/' + 'rep' + preservation_rep_num
+                preservation_rep_i += 1
                 fileGrp_element.attrib['USE'] = preservation_rep_name.capitalize()
                 for file_element in fileGrp_element.findall('{%s}file' % namespaces['']):
                     fileGrp_element.remove(file_element)
@@ -407,9 +407,11 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
     root_div_element = structmap_element.find('{%s}div' % namespaces[''])
     root_div_element.attrib['ID'] = new_uuid()
     for div in root_div_element.findall('{%s}div' % namespaces['']):
+        preservation_rep_i = 1
         if div.attrib['LABEL'].lower().startswith('representations'):
             rep_parts = Path(div.attrib['LABEL']).parts
             if len(rep_parts) == 1:  # 'Representations'
+                """
                 for sub_div in div.findall('{%s}div' % namespaces['']):
                     if sub_div.attrib['LABEL'].lower().startswith('rep'):
                         rep = sub_div.attrib['LABEL']
@@ -420,10 +422,15 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
                         for pointer in sub_div:
                             if str(pointer.tag) == '{%s}mptr' % namespaces['']:
                                 pointer.attrib['{%s}href' % namespaces['xlink']] = preservation_rep_path + '/METS.xml'
+            """
+                print("Unexpected error")
+                sys.exit(2)
             elif len(rep_parts) == 2:  # 'Representations/repx'
-                rep_name = rep_parts[1].rstrip('0123456789')
-                rep_number = "{:02}.1".format(int(rep_parts[1][len(rep_name):]))
-                preservation_rep_path = "{}/{}{}".format('representations', rep_name, rep_number)
+                # rep_name = rep_parts[1].rstrip('0123456789')
+                # rep_number = "{:02}.1".format(int(rep_parts[1][len(rep_name):]))
+                rep_number = "{:02}.1".format(preservation_rep_i)
+                rep_name = 'rep' + rep_number
+                preservation_rep_path = "{}/{}".format('representations', rep_name)
                 div.attrib['LABEL'] = 'Representations'
 
                 new_sub_div = ET.Element('{%s}div' % namespaces[''], attrib={'ID': '', 'LABEL': rep_name.capitalize() + rep_number})
@@ -497,7 +504,7 @@ def create_aip_representations(aip_path):
     """
     aip_submission_representations_path = aip_path / 'submission' / ('submission-' + str(datetime.now().strftime("%Y-%m-%d"))) / "representations"
 
-    rep_i = 0
+    rep_i = 1
     for rep in sorted(aip_submission_representations_path.iterdir()):
         '''
         rep = rep.stem
