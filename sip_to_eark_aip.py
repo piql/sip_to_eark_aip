@@ -42,9 +42,6 @@ def validate_directories(sip_dir, output_dir):
                         sip_uuid = sip_name
                         if 'uuid-' in sip_name:
                             sip_uuid = sip_name[sip_name.index('uuid-') + len('uuid-'):]
-
-                        # sip_uuid = str(sip_name[sip_name.index('uuid-') + len('uuid-'):])
-                        # sip_uuid = str(sip_name[sip_name.index('uuid-') + len('uuid-'):])
                         uuid_obj = uuid.UUID(sip_uuid, version=4)
                         if sip_uuid == str(uuid_obj):
                             pass
@@ -196,7 +193,6 @@ def create_aip_rep_mets(sip_rep_mets, rep_root):
         metshdr_elemet.attrib['{%s}OAISPACKAGETYPE' % namespaces['csip']] = 'AIP'
     except KeyError:
         logging.error("metsHdr doesn't containt OAISPACKAGETYPE as 'csip' is not in namespaces")
-        # print("Warning: metsHdr doesn't containt OAISPACKAGETYPE as 'csip' is not in namespaces")
         sys.exit(2)
 
     # FILE SECTION
@@ -243,20 +239,6 @@ def create_aip_rep_mets(sip_rep_mets, rep_root):
     tree.write(rep_root / 'METS.xml', encoding='utf-8', xml_declaration=True)
 
 
-def get_preservation_reps_name(rep):
-    """
-    Rename repx to rep0x.1
-    """
-    rep_name = rep.rstrip('0123456789')
-    try:
-        rep_num = "{:02}.1".format(int(rep[len(rep_name):]))
-    except ValueError:
-        logging.error("Bad METS.xml representations structure")
-        # print('ERROR in METS.xml representations structure')
-        sys.exit(2)
-    return rep_name + rep_num
-
-
 def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
     """
     The structure of the SIP and AIP are similar so it is possible to alter the SIP METS.xml
@@ -295,7 +277,6 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
             mdref_element = dmdsec_element.find('{%s}mdRef' % namespaces[''])
         except KeyError:
             logging.error("No mdRef found in dmdSec")
-            # print('No mdRef found in dmdSec')
             sys.exit(2)
         else:
             href = Path(mdref_element.attrib['{%s}href' % namespaces['xlink']])
@@ -337,11 +318,7 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
 
             id_updates[fileGrp_element.attrib['ID']] = fileGrp_element.attrib['ID'] = new_uuid()
 
-            if len(rep_parts) == 1:     # Representations
-                logging.error("Unsupported representations structure")
-                sys.exit(2)
-            elif len(rep_parts) == 2:   # Representations/rep1
-                # preservation_rep_name = rep_parts[0].lower() + '/' + get_preservation_reps_name(rep_parts[1])
+            if len(rep_parts) == 2:   # Representations/rep1
                 preservation_rep_num = "{:02}.1".format(preservation_rep_i)
                 preservation_rep_name = rep_parts[0].lower() + '/' + 'rep' + preservation_rep_num
                 preservation_rep_i += 1
@@ -368,45 +345,35 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
                                                     })
                     new_file_element.append(new_FLocat_element)
                     fileGrp_element.append(new_file_element)
+            else:
+                logging.error("Unsupported representations structure")
+                sys.exit(2)
 
     # STRUCT MAP
     structmap_element = root.find('{%s}structMap' % namespaces[''])
     root_div_element = structmap_element.find('{%s}div' % namespaces[''])
     root_div_element.attrib['ID'] = new_uuid()
+    rep_i = 1
     for div in root_div_element.findall('{%s}div' % namespaces['']):
-        preservation_rep_i = 1
         if div.attrib['LABEL'].lower().startswith('representations'):
             rep_parts = Path(div.attrib['LABEL']).parts
-            if len(rep_parts) == 1:  # 'Representations'
-                """
-                for sub_div in div.findall('{%s}div' % namespaces['']):
-                    if sub_div.attrib['LABEL'].lower().startswith('rep'):
-                        rep = sub_div.attrib['LABEL']
-                        rep_name = rep.rstrip('0123456789')
-                        rep_number = "{:02}.1".format(int(rep[len(rep_name):]))
-                        sub_div.attrib['LABEL'] = rep_name + rep_number
-                        preservation_rep_path = "{}/{}{}".format('representations', 'rep', rep_number)
-                        for pointer in sub_div:
-                            if str(pointer.tag) == '{%s}mptr' % namespaces['']:
-                                pointer.attrib['{%s}href' % namespaces['xlink']] = preservation_rep_path + '/METS.xml'
-            """
-                print("Unexpected error")
-                sys.exit(2)
-            elif len(rep_parts) == 2:  # 'Representations/repx'
-                # rep_name = rep_parts[1].rstrip('0123456789')
-                # rep_number = "{:02}.1".format(int(rep_parts[1][len(rep_name):]))
-                rep_number = "{:02}.1".format(preservation_rep_i)
-                rep_name = 'rep' + rep_number
-                preservation_rep_path = "{}/{}".format('representations', rep_name)
+            if len(rep_parts) == 2:  # 'Representations/repx'
+                rep_num = "{:02}.1".format(preservation_rep_i)
+                rep_name = 'rep' + rep_num
+                rep_i += 1
+                preservation_rep_path = Path('representations', rep_name)
                 div.attrib['LABEL'] = 'Representations'
 
-                new_sub_div = ET.Element('{%s}div' % namespaces[''], attrib={'ID': '', 'LABEL': rep_name.capitalize() + rep_number})
+                new_sub_div = ET.Element('{%s}div' % namespaces[''], attrib={'ID': '', 'LABEL': rep_name.capitalize() + rep_num})
                 div.append(new_sub_div)
 
                 item = div.find('{%s}mptr' % namespaces[''])
-                item.attrib['{%s}href' % namespaces['xlink']] = preservation_rep_path + '/METS.xml'
+                item.attrib['{%s}href' % namespaces['xlink']] = str(preservation_rep_path / 'METS.xml')
                 div.remove(item)
                 new_sub_div.append(item)
+            else:
+                logging.error("Unsupported representations structure")
+                sys.exit(2)
 
         if div.attrib['LABEL'].lower() == 'submission':
             root_div_element.remove(div)
@@ -442,7 +409,6 @@ def copy_sip_to_aip(sip_path, aip_path):
     aip_submission_path = aip_path / "submission" / ('submission-' + str(datetime.now().strftime("%Y-%m-%d")))
     expected_sip_reps_path = sip_path / 'representations'
     if expected_sip_reps_path.is_dir():
-        # if validate_representations_sequence(expected_sip_reps_path):
         aip_submission_path.mkdir(parents=True)
         for item in items_to_copy.keys():
             item_path = sip_path / item
@@ -455,13 +421,10 @@ def copy_sip_to_aip(sip_path, aip_path):
             elif item_path.is_file():
                 # Will be METS.xml
                 shutil.copy2(item_path, destination_path)
-        #else:
-        #    print("Exiting.")
-        #    sys.exit(1)
     else:
         print("Error: SIP representations directory not found")
         print("Exiting.")
-        sys.exit(1)
+        sys.exit(2)
 
 
 def create_aip_representations(aip_path):
@@ -509,8 +472,6 @@ def transform_sip_to_aip(sip_path, aip_path):
     if True:
         sip_name = sip_path.stem
         sip_uuid = get_uuid_from_string(sip_name)
-        # sip_uuid = sip_name[sip_name.index('uuid'):]
-        # package_name = sip_name[:sip_name.index('uuid')]
         package_name = sip_name[:-len(sip_uuid)]
         aip_uuid = new_uuid()
         aip_name = package_name + aip_uuid
@@ -546,8 +507,6 @@ def transform_sip_to_aip(sip_path, aip_path):
 
     logging.info("Finished transforming SIP: " + sip_name + " into AIP: " + aip_name)
 
-    # TODO:
-    #  - Transfer archivematica AIP into preservation
 
 
 if __name__ == '__main__':
