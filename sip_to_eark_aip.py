@@ -78,38 +78,6 @@ def overwrite_and_create_directory(directory):
         shutil.rmtree(directory)
     directory.mkdir(parents=True, exist_ok=False)
 
-'''
-def validate_representations_sequence(representations_path):
-    """
-    Validate SIP representations naming and sequence structure
-    :param Path representations_path: path to SIP representations folder to be vaildated
-    :return Boolean: True if valid
-    """
-    expected_sequence_number = 1
-    previous_folder_name = ''
-
-    for rep in sorted(representations_path.iterdir()):
-        rep = str(rep.stem)
-        folder_name = rep.rstrip('0123456789')
-        try:
-            sequence_number = int(rep[len(folder_name):])
-        except ValueError:
-            print("ERROR in SIP representation. No sequence number.")
-            return False
-
-        if expected_sequence_number == 1:
-            previous_folder_name = folder_name
-        elif folder_name != previous_folder_name:
-            print("ERROR in SIP representations naming sequence. Expected:", previous_folder_name, "Got:", folder_name)
-            return False
-
-        if expected_sequence_number == sequence_number:
-            expected_sequence_number += 1
-        else:
-            print("ERROR in SIP rep number sequence. Expected:", expected_sequence_number, "Got:", sequence_number)
-            return False
-    return True
-'''
 
 def new_uuid():
     return 'uuid-' + str(uuid.uuid4())
@@ -371,7 +339,6 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
 
             if len(rep_parts) == 1:     # Representations
                 logging.error("Unsupported representations structure")
-                # print("Unsupported repesentations structure")
                 sys.exit(2)
             elif len(rep_parts) == 2:   # Representations/rep1
                 # preservation_rep_name = rep_parts[0].lower() + '/' + get_preservation_reps_name(rep_parts[1])
@@ -506,13 +473,7 @@ def create_aip_representations(aip_path):
 
     rep_i = 1
     for rep in sorted(aip_submission_representations_path.iterdir()):
-        '''
-        rep = rep.stem
-        rep_name = rep.rstrip('0123456789')
-        rep_number = int(rep[len(rep_name):])
-        '''
-
-        # make preservation directory : rep1 -> rep01.1
+        # make preservation directory rep0x.1
         preservation_rep_path = aip_path / "representations" / "{}{:02}.1".format('rep', rep_i)
         (preservation_rep_path / "data").mkdir(parents=True)
         with open(preservation_rep_path / 'data' / 'TestAMTransfer.txt', 'w') as f:
@@ -526,10 +487,12 @@ def create_aip_representations(aip_path):
 def get_uuid_from_string(filename):
     try:
         the_uuid = filename
+        the_prefix = ''
         accepted_prefixs = ['uuid-']
         for prefix in accepted_prefixs:
             if prefix in filename:
-                the_uuid = filename[filename.index(prefix) + len(prefix)]
+                the_uuid = filename[filename.index(prefix) + len(prefix):]
+                the_prefix = prefix
                 break
         uuid_obj = uuid.UUID(the_uuid, version=4)
         if the_uuid == str(uuid_obj):
@@ -538,7 +501,7 @@ def get_uuid_from_string(filename):
         logging.error(filename + " doesn't contain valid uuid4")
         # print("Error: " + filename + " doesn't contain valid uuid4")
         sys.exit(2)
-    return the_uuid
+    return the_prefix + the_uuid
 
 
 def transform_sip_to_aip(sip_path, aip_path):
@@ -588,7 +551,8 @@ def transform_sip_to_aip(sip_path, aip_path):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG, filemode='a', filename='log.log', format='%(asctime)s %(levelname)s: %(message)s')
+    Path("logs").mkdir(exist_ok=True)
+    logging.basicConfig(level=logging.DEBUG, filemode='a', filename='logs/sip_to_eark_aip.log', format='%(asctime)s %(levelname)s: %(message)s')
     if len(sys.argv) == 3:
         if validate_directories(Path(get_arg(1)), Path(get_arg(2))):
             transform_sip_to_aip(Path(get_arg(1)), Path(get_arg(2)))
