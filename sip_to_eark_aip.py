@@ -257,11 +257,12 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
     created_now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f%z")
 
     # METS HEADER
-    metshdr_elemet = root.find('{%s}metsHdr' % namespaces[''])
-    metshdr_elemet.attrib['LASTMODDATE'] = created_now
-    metshdr_elemet.attrib['RECORDSTATUS'] = 'Revised'
+    metshdr_element = root.find('{%s}metsHdr' % namespaces[''])
+    metshdr_element.attrib['CREATEDATE'] = created_now
+    metshdr_element.attrib['LASTMODDATE'] = created_now
+    metshdr_element.attrib['RECORDSTATUS'] = 'Revised'
     try:
-        metshdr_elemet.attrib['{%s}OAISPACKAGETYPE' % namespaces['csip']] = 'AIP'
+        metshdr_element.attrib['{%s}OAISPACKAGETYPE' % namespaces['csip']] = 'AIP'
     except KeyError:
         print("Warning: metsHdr doesn't contain OAISPACKAGETYPE")
         sys.exit(2)
