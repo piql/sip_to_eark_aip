@@ -21,6 +21,7 @@ def validate_directories(dir: Path):
         logging.error("Error: Input directory doesn't exist")
     return False
 
+
 def get_namespaces(mets_file):
     # register namespaces to ET parser
     namespaces = {value[0]: value[1] for key, value in ET.iterparse(mets_file, events=['start-ns'])}
@@ -32,8 +33,10 @@ def get_namespaces(mets_file):
 def new_uuid():
     return 'uuid-' + str(uuid.uuid4())
     
+
 def new_id():
     return 'ID-' + str(uuid.uuid4())
+
 
 def get_checksum(file):
     sha256_hash = hashlib.sha256()
@@ -41,6 +44,7 @@ def get_checksum(file):
         for byte_block in iter(lambda: f.read(4096), b""):
             sha256_hash.update(byte_block)
         return sha256_hash.hexdigest()
+
 
 def update_rep_mets(directory):
     expected_mets_path = directory / "METS.xml"
@@ -111,6 +115,7 @@ def update_rep_mets(directory):
     else:
         logging.error("Error: METS.xml not found in directory: " + expected_mets_path)
         sys.exit(2)
+
 
 def update_root_mets(directory):
     expected_mets_path = directory / "METS.xml"
