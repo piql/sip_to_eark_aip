@@ -508,13 +508,14 @@ def transform_sip_to_aip(sip_path, aip_path):
     logging.info("Finished transforming SIP: " + sip_name + " into AIP: " + aip_name)
 
 
-
 if __name__ == '__main__':
     Path("logs").mkdir(exist_ok=True)
     logging.basicConfig(level=logging.DEBUG, filemode='a', filename='logs/sip_to_eark_aip.log', format='%(asctime)s %(levelname)s: %(message)s')
     if len(sys.argv) == 3:
-        if validate_directories(Path(get_arg(1)), Path(get_arg(2))):
-            transform_sip_to_aip(Path(get_arg(1)), Path(get_arg(2)))
+        input_sip = Path(get_arg(1))
+        output_dir = Path(get_arg(2))
+        if validate_directories(input_sip, output_dir):
+            transform_sip_to_aip(input_sip, output_dir)
         else:
             sys.exit(1)
     else:
