@@ -9,6 +9,10 @@ from datetime import datetime
 from pathlib import Path
 
 
+SOFTWARE_NAME = "E-ARK AIP Creator"
+SOFTWARE_VERSION = "v0.1.0-dev"
+
+
 def get_arg(index):
     try:
         sys.argv[index]
@@ -186,14 +190,40 @@ def create_aip_rep_mets(sip_rep_mets, rep_root):
     root.attrib['OBJID'] = rep_root.name
 
     # METS HEADER
-    metshdr_elemet = root.find('{%s}metsHdr' % namespaces[''])
-    metshdr_elemet.attrib['LASTMODDATE'] = created_now
-    metshdr_elemet.attrib['RECORDSTATUS'] = 'Revised'
+    metshdr_element = root.find('{%s}metsHdr' % namespaces[''])
+    metshdr_element.attrib['CREATEDATE'] = created_now
+    metshdr_element.attrib['LASTMODDATE'] = created_now
+    metshdr_element.attrib['RECORDSTATUS'] = 'Revised'
     try:
-        metshdr_elemet.attrib['{%s}OAISPACKAGETYPE' % namespaces['csip']] = 'AIP'
+        metshdr_element.attrib['{%s}OAISPACKAGETYPE' % namespaces['csip']] = 'AIP'
     except KeyError:
         logging.error("metsHdr doesn't containt OAISPACKAGETYPE as 'csip' is not in namespaces")
         sys.exit(2)
+
+    for agent_element in metshdr_element.findall('{%s}agent' % namespaces['']):
+        agent_attribs = agent_element.attrib
+        try:
+            if agent_attribs['ROLE'] == 'CREATOR' and agent_attribs['TYPE'] == 'OTHER' and agent_attribs['OTHERTYPE'] == 'SOFTWARE':
+                metshdr_element.remove(agent_element)
+        except KeyError:
+            pass
+
+        new_agent = ET.Element('{%s}agent' % namespaces[''], attrib={'ROLE': 'CREATOR', 'TYPE': 'OTHER', 'OTHERTYPE': 'SOFTWARE'})
+        new_agent_name = ET.SubElement(new_agent, '{%s}name' % namespaces[''])
+        new_agent_name.text = SOFTWARE_NAME
+        new_agent_note = ET.SubElement(new_agent, '{%s}note' % namespaces[''], attrib={'{%s}NOTETYPE' % namespaces['csip']: 'SOFTWARE_VERSION'})
+        new_agent_note.text = SOFTWARE_VERSION
+        metshdr_element.append(new_agent)
+
+        try:
+            if agent_attribs['ROLE'] == 'CREATOR' and agent_attribs['TYPE'] == 'INDIVIDUAL':
+                metshdr_element.remove(agent_element)
+        except KeyError:
+            pass
+    
+    metsDocumentId_element = metshdr_element.find('{%s}metsDocumentID' % namespaces[''])
+    if metsDocumentId_element is not None:
+        metshdr_element.remove(metsDocumentId_element)
 
     # FILE SECTION
     filesec_element = root.find('{%s}fileSec' % namespaces[''])
@@ -266,6 +296,27 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
     except KeyError:
         print("Warning: metsHdr doesn't contain OAISPACKAGETYPE")
         sys.exit(2)
+
+    for agent_element in metshdr_element.findall('{%s}agent' % namespaces['']):
+        agent_attribs = agent_element.attrib
+        try:
+            if agent_attribs['ROLE'] == 'CREATOR' and agent_attribs['TYPE'] == 'OTHER' and agent_attribs['OTHERTYPE'] == 'SOFTWARE':
+                metshdr_element.remove(agent_element)
+                new_agent = ET.Element('{%s}agent' % namespaces[''], attrib={'ROLE': 'CREATOR', 'TYPE': 'OTHER', 'OTHERTYPE': 'SOFTWARE'})
+                new_agent_name = ET.SubElement(new_agent, '{%s}name' % namespaces[''])
+                new_agent_name.text = SOFTWARE_NAME
+                new_agent_note = ET.SubElement(new_agent, '{%s}note' % namespaces[''], attrib={'{%s}NOTETYPE' % namespaces['csip']: 'SOFTWARE_VERSION'})
+                new_agent_note.text = SOFTWARE_VERSION
+                metshdr_element.append(new_agent)
+        except KeyError:
+            pass
+        
+        try:
+            if agent_attribs['ROLE'] == 'CREATOR' and agent_attribs['TYPE'] == 'INDIVIDUAL':
+                metshdr_element.remove(agent_element)
+        except KeyError:
+            pass
+
 
     # DMD SEC
     # Expected SHA-256 checksum
