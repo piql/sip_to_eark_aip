@@ -211,7 +211,7 @@ def create_aip_rep_mets(sip_rep_mets, rep_root):
         new_agent = ET.Element('{%s}agent' % namespaces[''], attrib={'ROLE': 'CREATOR', 'TYPE': 'OTHER', 'OTHERTYPE': 'SOFTWARE'})
         new_agent_name = ET.SubElement(new_agent, '{%s}name' % namespaces[''])
         new_agent_name.text = SOFTWARE_NAME
-        new_agent_note = ET.SubElement(new_agent, '{%s}note' % namespaces[''], attrib={'{%s}NOTETYPE' % namespaces['csip']: 'SOFTWARE_VERSION'})
+        new_agent_note = ET.SubElement(new_agent, '{%s}note' % namespaces[''], attrib={'{%s}NOTETYPE' % namespaces['csip']: 'SOFTWARE VERSION'})
         new_agent_note.text = SOFTWARE_VERSION
         metshdr_element.append(new_agent)
 
@@ -305,7 +305,7 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
                 new_agent = ET.Element('{%s}agent' % namespaces[''], attrib={'ROLE': 'CREATOR', 'TYPE': 'OTHER', 'OTHERTYPE': 'SOFTWARE'})
                 new_agent_name = ET.SubElement(new_agent, '{%s}name' % namespaces[''])
                 new_agent_name.text = SOFTWARE_NAME
-                new_agent_note = ET.SubElement(new_agent, '{%s}note' % namespaces[''], attrib={'{%s}NOTETYPE' % namespaces['csip']: 'SOFTWARE_VERSION'})
+                new_agent_note = ET.SubElement(new_agent, '{%s}note' % namespaces[''], attrib={'{%s}NOTETYPE' % namespaces['csip']: 'SOFTWARE VERSION'})
                 new_agent_note.text = SOFTWARE_VERSION
                 metshdr_element.append(new_agent)
         except KeyError:
