@@ -410,13 +410,13 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
         if div.attrib['LABEL'].lower().startswith('representations'):
             rep_parts = Path(div.attrib['LABEL']).parts
             if len(rep_parts) == 2:  # 'Representations/repx'
-                rep_num = "{:02}.1".format(preservation_rep_i)
+                rep_num = "{:02}.1".format(rep_i)
                 rep_name = 'rep' + rep_num
                 rep_i += 1
                 preservation_rep_path = Path('representations', rep_name)
                 div.attrib['LABEL'] = 'Representations'
 
-                new_sub_div = ET.Element('{%s}div' % namespaces[''], attrib={'ID': '', 'LABEL': rep_name.capitalize() + rep_num})
+                new_sub_div = ET.Element('{%s}div' % namespaces[''], attrib={'ID': '', 'LABEL': rep_name.capitalize()})
                 div.append(new_sub_div)
 
                 item = div.find('{%s}mptr' % namespaces[''])
