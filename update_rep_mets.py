@@ -1,29 +1,26 @@
 from datetime import datetime
 import hashlib
+import logging
 import mimetypes
 import sys
 from pathlib import Path
 import uuid
 import xml.etree.ElementTree as ET
 
-def get_arg(index):
-    try:
-        sys.argv[index]
-    except IndexError:
-        return None
-    else:
-        return sys.argv[index]
 
-
-def validate_directories(dir):
+def validate_directories(dir: Path):
     if dir.exists():
         if dir.is_dir():
+            # We want to make sure we are not in the SIP root
+            if (dir / 'submission').is_dir() or (dir / 'schemas').is_dir():
+                logging.error('Directory appears as root. Require representation directory')
             return True
         else:
-            print("Error: Input is not a directory")
+            logging.error("Error: Input is not a directory")
     else:
-        print("Error: Input directory doesn't exist")
+        logging.error("Error: Input directory doesn't exist")
     return False
+
 
 def get_namespaces(mets_file):
     # register namespaces to ET parser
@@ -36,8 +33,10 @@ def get_namespaces(mets_file):
 def new_uuid():
     return 'uuid-' + str(uuid.uuid4())
     
+
 def new_id():
     return 'ID-' + str(uuid.uuid4())
+
 
 def get_checksum(file):
     sha256_hash = hashlib.sha256()
@@ -45,6 +44,7 @@ def get_checksum(file):
         for byte_block in iter(lambda: f.read(4096), b""):
             sha256_hash.update(byte_block)
         return sha256_hash.hexdigest()
+
 
 def update_rep_mets(directory):
     expected_mets_path = directory / "METS.xml"
@@ -59,23 +59,24 @@ def update_rep_mets(directory):
 
         filesec_element = root.find('{%s}fileSec' % namespaces[''])
         filegrp_elements = filesec_element.findall('{%s}fileGrp' % namespaces[''])
+
         if len(filegrp_elements) != 1:
-            print("Error: Explicitly one filegrp element expected")
-            sys.exit(1)
+            logging.error("Error: Explicitly one filegrp element expected")
+            sys.exit(2)
         file_elements = filegrp_elements[0].findall('{%s}file' % namespaces[''])
         if len(file_elements) != 1:
-            print("Error: Explicitly one file element expected")
-            sys.exit(1)
+            logging.error("Error: Explicitly one file element expected")
+            sys.exit(2)
 
         if not (directory / 'data').is_dir():
-            print("Error: data directory not found.")
-            sys.exit(1)
+            logging.error("Error: data directory not found.")
+            sys.exit(2)
 
         files_in_data = [Path(f) for f in (directory / 'data').iterdir()]
 
         if len(files_in_data) > 2:
-            print("Error: Too many files found in data dir")
-            sys.exit(1)
+            logging.error("Error: Too many files found in data dir")
+            sys.exit(2)
 
         text_file = ''
         zip_file = ''
@@ -85,12 +86,12 @@ def update_rep_mets(directory):
             elif f.suffix == ".zip" and zip_file == '':
                 zip_file = f
             else:
-                print("Error: Unexpected file in data dir")
-                sys.exit(1)
+                logging.error("Error: Unexpected file in data dir")
+                sys.exit(2)
         
         if zip_file == '':
-            print("Error: No zip found")
-            sys.exit(1)
+            logging.error("Error: No zip found")
+            sys.exit(2)
         
         new_file = ET.Element('{%s}file' % namespaces[''],
                             attrib={'ID': new_id(), 'MIMETYPE': str(mimetypes.guess_type(str(zip_file))[0]),
@@ -106,14 +107,15 @@ def update_rep_mets(directory):
         
         ET.indent(tree, space='    ', level=0)
         tree.write(directory / 'METS.xml', encoding='utf-8', xml_declaration=True)
-        print("METS written in:", directory)
+        logging.info("METS written in: " + str(directory))
 
         if text_file != '':
             text_file.unlink()
         
     else:
-        print("Error: METS.xml not found in directory:", expected_mets_path)
-        sys.exit(1)
+        logging.error("Error: METS.xml not found in directory: " + expected_mets_path)
+        sys.exit(2)
+
 
 def update_root_mets(directory):
     expected_mets_path = directory / "METS.xml"
@@ -139,25 +141,27 @@ def update_root_mets(directory):
                     file_element.set('CHECKSUMTYPE', 'SHA-256')
             elif fileGrp_use.lower() == 'submission':
                 fileGrp_element.set('USE', str(Path(fileGrp_element.find('{%s}file' % namespaces['']).find('{%s}FLocat' % namespaces['']).get('{%s}href' % namespaces['xlink'])).parent))
-                print('use:', fileGrp_use)
 
         ET.indent(tree, space='    ', level=0)
         tree.write(directory / 'METS.xml', encoding='utf-8', xml_declaration=True)
-        print("METS written in:", directory)
+        logging.info("METS written in: " + str(directory))
 
 
 if __name__ == '__main__':
+    Path("logs").mkdir(exist_ok=True)
+    logging.basicConfig(level=logging.DEBUG, filemode='a', filename='logs/update_rep_mets.log', format='%(asctime)s %(levelname)s: %(message)s')
     if len(sys.argv) == 2:
         rep_dir = Path(sys.argv[1])
         if validate_directories(rep_dir):
-            print('Updating rep mets:', rep_dir)
+            logging.info('Updating rep mets: ' + str(rep_dir))
             update_rep_mets(rep_dir)
-            print('Updating root mets:', rep_dir.parents[1])
+            logging.info('Updating root mets: ' + str(rep_dir.parents[1]))
             update_root_mets(rep_dir.parents[1])
         else:
-            print("invalid dir")
+            logging.error('Directory Invalid: ' + str(rep_dir))
             sys.exit(1)
     else:
+        logging.error("Incorrect script call format")
         print("Error: Command should have the form:")
         print("python main.py <Directory>")
         sys.exit(1)

@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import mimetypes
 import shutil
 import sys
@@ -6,6 +7,10 @@ import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
+
+
+SOFTWARE_NAME = "E-ARK AIP Creator"
+SOFTWARE_VERSION = "v0.1.0-dev"
 
 
 def get_arg(index):
@@ -38,23 +43,29 @@ def validate_directories(sip_dir, output_dir):
                 if output_dir.is_dir():
                     sip_name = sip_dir.stem
                     try:
-                        sip_uuid = str(sip_name[sip_name.index('uuid-') + len('uuid-'):])
+                        sip_uuid = sip_name
+                        if 'uuid-' in sip_name:
+                            sip_uuid = sip_name[sip_name.index('uuid-') + len('uuid-'):]
                         uuid_obj = uuid.UUID(sip_uuid, version=4)
                         if sip_uuid == str(uuid_obj):
                             pass
                     except ValueError:
-                        print("Error: SIP doesn't contain valid uuid4")
+                        logging.error("SIP does not contain valid uuid4")
+                        # print("Error: SIP doesn't contain valid uuid4")
                         sys.exit(2)
                     else:
                         return True
                 else:
-                    print("Error: Output is not a directory")
+                    logging.error("Output is not a directory")
+                    # print("Error: Output is not a directory")
             else:
                 return True
         else:
-            print("Error: Input is not a directory")
+            logging.error("Input is not a directory")
+            # print("Error: Input is not a directory")
     else:
-        print("Error: Input directory doesn't exist")
+        logging.error("Input Directory doesn't exist")
+        # print("Error: Input directory doesn't exist")
     return False
 
 
@@ -64,41 +75,9 @@ def overwrite_and_create_directory(directory):
     :param Path directory: path that needs to be (re)created
     """
     if directory.is_dir():
-        # print("Overwriting '%s'" % directory)
+        logging.info("Overwriting '%s'" % directory)
         shutil.rmtree(directory)
     directory.mkdir(parents=True, exist_ok=False)
-
-
-def validate_representations_sequence(representations_path):
-    """
-    Validate SIP representations naming and sequence structure
-    :param Path representations_path: path to SIP representations folder to be vaildated
-    :return Boolean: True if valid
-    """
-    expected_sequence_number = 1
-    previous_folder_name = ''
-
-    for rep in sorted(representations_path.iterdir()):
-        rep = str(rep.stem)
-        folder_name = rep.rstrip('0123456789')
-        try:
-            sequence_number = int(rep[len(folder_name):])
-        except ValueError:
-            print("ERROR in SIP representation. No sequence number.")
-            return False
-
-        if expected_sequence_number == 1:
-            previous_folder_name = folder_name
-        elif folder_name != previous_folder_name:
-            print("ERROR in SIP representations naming sequence. Expected:", previous_folder_name, "Got:", folder_name)
-            return False
-
-        if expected_sequence_number == sequence_number:
-            expected_sequence_number += 1
-        else:
-            print("ERROR in SIP rep number sequence. Expected:", expected_sequence_number, "Got:", sequence_number)
-            return False
-    return True
 
 
 def new_uuid():
@@ -211,14 +190,40 @@ def create_aip_rep_mets(sip_rep_mets, rep_root):
     root.attrib['OBJID'] = rep_root.name
 
     # METS HEADER
-    metshdr_elemet = root.find('{%s}metsHdr' % namespaces[''])
-    metshdr_elemet.attrib['LASTMODDATE'] = created_now
-    metshdr_elemet.attrib['RECORDSTATUS'] = 'Revised'
+    metshdr_element = root.find('{%s}metsHdr' % namespaces[''])
+    metshdr_element.attrib['CREATEDATE'] = created_now
+    metshdr_element.attrib['LASTMODDATE'] = created_now
+    metshdr_element.attrib['RECORDSTATUS'] = 'Revised'
     try:
-        metshdr_elemet.attrib['{%s}OAISPACKAGETYPE' % namespaces['csip']] = 'AIP'
+        metshdr_element.attrib['{%s}OAISPACKAGETYPE' % namespaces['csip']] = 'AIP'
     except KeyError:
-        print("Warning: metsHdr doesn't containt OAISPACKAGETYPE as 'csip' is not in namespaces")
+        logging.error("metsHdr doesn't containt OAISPACKAGETYPE as 'csip' is not in namespaces")
         sys.exit(2)
+
+    for agent_element in metshdr_element.findall('{%s}agent' % namespaces['']):
+        agent_attribs = agent_element.attrib
+        try:
+            if agent_attribs['ROLE'] == 'CREATOR' and agent_attribs['TYPE'] == 'OTHER' and agent_attribs['OTHERTYPE'] == 'SOFTWARE':
+                metshdr_element.remove(agent_element)
+        except KeyError:
+            pass
+
+        new_agent = ET.Element('{%s}agent' % namespaces[''], attrib={'ROLE': 'CREATOR', 'TYPE': 'OTHER', 'OTHERTYPE': 'SOFTWARE'})
+        new_agent_name = ET.SubElement(new_agent, '{%s}name' % namespaces[''])
+        new_agent_name.text = SOFTWARE_NAME
+        new_agent_note = ET.SubElement(new_agent, '{%s}note' % namespaces[''], attrib={'{%s}NOTETYPE' % namespaces['csip']: 'SOFTWARE VERSION'})
+        new_agent_note.text = SOFTWARE_VERSION
+        metshdr_element.append(new_agent)
+
+        try:
+            if agent_attribs['ROLE'] == 'CREATOR' and agent_attribs['TYPE'] == 'INDIVIDUAL':
+                metshdr_element.remove(agent_element)
+        except KeyError:
+            pass
+    
+    metsDocumentId_element = metshdr_element.find('{%s}metsDocumentID' % namespaces[''])
+    if metsDocumentId_element is not None:
+        metshdr_element.remove(metsDocumentId_element)
 
     # FILE SECTION
     filesec_element = root.find('{%s}fileSec' % namespaces[''])
@@ -264,19 +269,6 @@ def create_aip_rep_mets(sip_rep_mets, rep_root):
     tree.write(rep_root / 'METS.xml', encoding='utf-8', xml_declaration=True)
 
 
-def get_preservation_reps_name(rep):
-    """
-    Rename repx to rep0x.1
-    """
-    rep_name = rep.rstrip('0123456789')
-    try:
-        rep_num = "{:02}.1".format(int(rep[len(rep_name):]))
-    except ValueError:
-        print('ERROR in METS.xml representations structure')
-        sys.exit(1)
-    return rep_name + rep_num
-
-
 def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
     """
     The structure of the SIP and AIP are similar so it is possible to alter the SIP METS.xml
@@ -295,14 +287,35 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
     created_now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f%z")
 
     # METS HEADER
-    metshdr_elemet = root.find('{%s}metsHdr' % namespaces[''])
-    metshdr_elemet.attrib['LASTMODDATE'] = created_now
-    metshdr_elemet.attrib['RECORDSTATUS'] = 'Revised'
+    metshdr_element = root.find('{%s}metsHdr' % namespaces[''])
+    metshdr_element.attrib['CREATEDATE'] = created_now
+    metshdr_element.attrib['LASTMODDATE'] = created_now
+    metshdr_element.attrib['RECORDSTATUS'] = 'Revised'
     try:
-        metshdr_elemet.attrib['{%s}OAISPACKAGETYPE' % namespaces['csip']] = 'AIP'
+        metshdr_element.attrib['{%s}OAISPACKAGETYPE' % namespaces['csip']] = 'AIP'
     except KeyError:
         print("Warning: metsHdr doesn't contain OAISPACKAGETYPE")
         sys.exit(2)
+
+    for agent_element in metshdr_element.findall('{%s}agent' % namespaces['']):
+        agent_attribs = agent_element.attrib
+        try:
+            if agent_attribs['ROLE'] == 'CREATOR' and agent_attribs['TYPE'] == 'OTHER' and agent_attribs['OTHERTYPE'] == 'SOFTWARE':
+                metshdr_element.remove(agent_element)
+                new_agent = ET.Element('{%s}agent' % namespaces[''], attrib={'ROLE': 'CREATOR', 'TYPE': 'OTHER', 'OTHERTYPE': 'SOFTWARE'})
+                new_agent_name = ET.SubElement(new_agent, '{%s}name' % namespaces[''])
+                new_agent_name.text = SOFTWARE_NAME
+                new_agent_note = ET.SubElement(new_agent, '{%s}note' % namespaces[''], attrib={'{%s}NOTETYPE' % namespaces['csip']: 'SOFTWARE VERSION'})
+                new_agent_note.text = SOFTWARE_VERSION
+                metshdr_element.append(new_agent)
+        except KeyError:
+            pass
+        
+        try:
+            if agent_attribs['ROLE'] == 'CREATOR' and agent_attribs['TYPE'] == 'INDIVIDUAL':
+                metshdr_element.remove(agent_element)
+        except KeyError:
+            pass
 
 
     # DMD SEC
@@ -315,7 +328,7 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
         try:
             mdref_element = dmdsec_element.find('{%s}mdRef' % namespaces[''])
         except KeyError:
-            print('No mdRef found in dmdSec')
+            logging.error("No mdRef found in dmdSec")
             sys.exit(2)
         else:
             href = Path(mdref_element.attrib['{%s}href' % namespaces['xlink']])
@@ -345,7 +358,8 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
     new_file.append(new_flocat)
     new_filegrp.append(new_file)
     filesec_element.append(new_filegrp)
-
+    
+    preservation_rep_i = 1
     # EACH FILE GROUP
     for fileGrp_element in filesec_element.findall('{%s}fileGrp' % namespaces['']):
         # Convert SIP representations to preservation represnetations
@@ -356,15 +370,10 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
 
             id_updates[fileGrp_element.attrib['ID']] = fileGrp_element.attrib['ID'] = new_uuid()
 
-            if len(rep_parts) == 1:     # Representations
-                """
-                for sub_fileGrp_element in fileGrp_element.findall('{%s}' % namespaces['']):
-                    fileGrp_element.remove(sub_fileGrp_element)
-                """
-                print("Unsupported repesentations structure")
-                sys.exit(2)
-            elif len(rep_parts) == 2:   # Representations/rep1
-                preservation_rep_name = rep_parts[0].lower() + '/' + get_preservation_reps_name(rep_parts[1])
+            if len(rep_parts) == 2:   # Representations/rep1
+                preservation_rep_num = "{:02}.1".format(preservation_rep_i)
+                preservation_rep_name = rep_parts[0].lower() + '/' + 'rep' + preservation_rep_num
+                preservation_rep_i += 1
                 fileGrp_element.attrib['USE'] = preservation_rep_name.capitalize()
                 for file_element in fileGrp_element.findall('{%s}file' % namespaces['']):
                     fileGrp_element.remove(file_element)
@@ -388,38 +397,35 @@ def create_aip_root_mets(sip_mets: Path, aip_root: Path, id_updates):
                                                     })
                     new_file_element.append(new_FLocat_element)
                     fileGrp_element.append(new_file_element)
+            else:
+                logging.error("Unsupported representations structure")
+                sys.exit(2)
 
     # STRUCT MAP
     structmap_element = root.find('{%s}structMap' % namespaces[''])
     root_div_element = structmap_element.find('{%s}div' % namespaces[''])
     root_div_element.attrib['ID'] = new_uuid()
+    rep_i = 1
     for div in root_div_element.findall('{%s}div' % namespaces['']):
         if div.attrib['LABEL'].lower().startswith('representations'):
             rep_parts = Path(div.attrib['LABEL']).parts
-            if len(rep_parts) == 1:  # 'Representations'
-                for sub_div in div.findall('{%s}div' % namespaces['']):
-                    if sub_div.attrib['LABEL'].lower().startswith('rep'):
-                        rep = sub_div.attrib['LABEL']
-                        rep_name = rep.rstrip('0123456789')
-                        rep_number = "{:02}.1".format(int(rep[len(rep_name):]))
-                        sub_div.attrib['LABEL'] = rep_name + rep_number
-                        preservation_rep_path = "{}/{}{}".format('representations', 'rep', rep_number)
-                        for pointer in sub_div:
-                            if str(pointer.tag) == '{%s}mptr' % namespaces['']:
-                                pointer.attrib['{%s}href' % namespaces['xlink']] = preservation_rep_path + '/METS.xml'
-            elif len(rep_parts) == 2:  # 'Representations/repx'
-                rep_name = rep_parts[1].rstrip('0123456789')
-                rep_number = "{:02}.1".format(int(rep_parts[1][len(rep_name):]))
-                preservation_rep_path = "{}/{}{}".format('representations', rep_name, rep_number)
+            if len(rep_parts) == 2:  # 'Representations/repx'
+                rep_num = "{:02}.1".format(rep_i)
+                rep_name = 'rep' + rep_num
+                rep_i += 1
+                preservation_rep_path = Path('representations', rep_name)
                 div.attrib['LABEL'] = 'Representations'
 
-                new_sub_div = ET.Element('{%s}div' % namespaces[''], attrib={'ID': '', 'LABEL': rep_name.capitalize() + rep_number})
+                new_sub_div = ET.Element('{%s}div' % namespaces[''], attrib={'ID': '', 'LABEL': rep_name.capitalize()})
                 div.append(new_sub_div)
 
                 item = div.find('{%s}mptr' % namespaces[''])
-                item.attrib['{%s}href' % namespaces['xlink']] = preservation_rep_path + '/METS.xml'
+                item.attrib['{%s}href' % namespaces['xlink']] = str(preservation_rep_path / 'METS.xml')
                 div.remove(item)
                 new_sub_div.append(item)
+            else:
+                logging.error("Unsupported representations structure")
+                sys.exit(2)
 
         if div.attrib['LABEL'].lower() == 'submission':
             root_div_element.remove(div)
@@ -455,26 +461,22 @@ def copy_sip_to_aip(sip_path, aip_path):
     aip_submission_path = aip_path / "submission" / ('submission-' + str(datetime.now().strftime("%Y-%m-%d")))
     expected_sip_reps_path = sip_path / 'representations'
     if expected_sip_reps_path.is_dir():
-        if validate_representations_sequence(expected_sip_reps_path):
-            aip_submission_path.mkdir(parents=True)
-            for item in items_to_copy.keys():
-                item_path = sip_path / item
-                destination_path = aip_submission_path / item
-                if item_path.is_dir():
-                    shutil.copytree(item_path, destination_path)
-                    # if True, also copy item into aip root
-                    if items_to_copy[item]:
-                        shutil.copytree(item_path, aip_path / item)
-                elif item_path.is_file():
-                    # Will be METS.xml
-                    shutil.copy2(item_path, destination_path)
-        else:
-            print("Exiting.")
-            sys.exit(1)
+        aip_submission_path.mkdir(parents=True)
+        for item in items_to_copy.keys():
+            item_path = sip_path / item
+            destination_path = aip_submission_path / item
+            if item_path.is_dir():
+                shutil.copytree(item_path, destination_path)
+                # if True, also copy item into aip root
+                if items_to_copy[item]:
+                    shutil.copytree(item_path, aip_path / item)
+            elif item_path.is_file():
+                # Will be METS.xml
+                shutil.copy2(item_path, destination_path)
     else:
         print("Error: SIP representations directory not found")
         print("Exiting.")
-        sys.exit(1)
+        sys.exit(2)
 
 
 def create_aip_representations(aip_path):
@@ -484,26 +486,45 @@ def create_aip_representations(aip_path):
     """
     aip_submission_representations_path = aip_path / 'submission' / ('submission-' + str(datetime.now().strftime("%Y-%m-%d"))) / "representations"
 
+    rep_i = 1
     for rep in sorted(aip_submission_representations_path.iterdir()):
-        rep = rep.stem
-        rep_name = rep.rstrip('0123456789')
-        rep_number = int(rep[len(rep_name):])
-
-        # make preservation directory : rep1 -> rep01.1
-        preservation_rep_path = aip_path / "representations" / "{}{:02}.1".format('rep', rep_number)
+        # make preservation directory rep0x.1
+        preservation_rep_path = aip_path / "representations" / "{}{:02}.1".format('rep', rep_i)
         (preservation_rep_path / "data").mkdir(parents=True)
         with open(preservation_rep_path / 'data' / 'TestAMTransfer.txt', 'w') as f:
             f.write("Just some random text")
 
-        create_aip_rep_mets(aip_submission_representations_path / rep / 'METS.xml', preservation_rep_path)
+        create_aip_rep_mets(rep / 'METS.xml', preservation_rep_path)
+
+        rep_i += 1
+
+
+def get_uuid_from_string(filename):
+    try:
+        the_uuid = filename
+        the_prefix = ''
+        accepted_prefixs = ['uuid-']
+        for prefix in accepted_prefixs:
+            if prefix in filename:
+                the_uuid = filename[filename.index(prefix) + len(prefix):]
+                the_prefix = prefix
+                break
+        uuid_obj = uuid.UUID(the_uuid, version=4)
+        if the_uuid == str(uuid_obj):
+            pass
+    except ValueError:
+        logging.error(filename + " doesn't contain valid uuid4")
+        # print("Error: " + filename + " doesn't contain valid uuid4")
+        sys.exit(2)
+    return the_prefix + the_uuid
 
 
 def transform_sip_to_aip(sip_path, aip_path):
     # Make False for testing to prevent giving aip new uuid and save space
     if True:
         sip_name = sip_path.stem
-        sip_uuid = sip_name[sip_name.index('uuid'):]
-        package_name = sip_name[:sip_name.index('uuid')]
+        sip_uuid = get_uuid_from_string(sip_name)
+        package_name = sip_name[:-len(sip_uuid)]
         aip_uuid = new_uuid()
         aip_name = package_name + aip_uuid
         aip_path = aip_path / aip_name
@@ -536,17 +557,21 @@ def transform_sip_to_aip(sip_path, aip_path):
 
     print(aip_name)
 
-    # TODO:
-    #  - Transfer archivematica AIP into preservation
+    logging.info("Finished transforming SIP: " + sip_name + " into AIP: " + aip_name)
 
 
 if __name__ == '__main__':
+    Path("logs").mkdir(exist_ok=True)
+    logging.basicConfig(level=logging.DEBUG, filemode='a', filename='logs/sip_to_eark_aip.log', format='%(asctime)s %(levelname)s: %(message)s')
     if len(sys.argv) == 3:
-        if validate_directories(Path(get_arg(1)), Path(get_arg(2))):
-            transform_sip_to_aip(Path(get_arg(1)), Path(get_arg(2)))
+        input_sip = Path(get_arg(1))
+        output_dir = Path(get_arg(2))
+        if validate_directories(input_sip, output_dir):
+            transform_sip_to_aip(input_sip, output_dir)
         else:
             sys.exit(1)
     else:
+        logging.error("Incorrect script call format")
         print("Error: Command should have the form:")
-        print("python main.py <SIP Directory> <Output Directory>")
+        print("python aip_to_eark_aip.py <SIP Directory> <Output Directory>")
         sys.exit(1)
