@@ -159,8 +159,15 @@ def update_mets(mets_path:Path):
 
         # Struct Map - Div - Div - FPTR
         # Update ID to fileGrp ID
+        """
         fptr_element = div_element.find('{%s}fptr' % namespaces[''])
         if fptr_element is not None:
+            if fptr_element.get('FILEID') in id_updates:
+                fptr_element.set('FILEID', id_updates[fptr_element.get('FILEID')])
+            else:
+                fptr_element.set('FILEID', new_uuid())
+        """
+        for fptr_element in div_element.findall('{%s}fptr' % namespaces['']):
             if fptr_element.get('FILEID') in id_updates:
                 fptr_element.set('FILEID', id_updates[fptr_element.get('FILEID')])
             else:
@@ -168,12 +175,19 @@ def update_mets(mets_path:Path):
 
         # Struct Map - Div - Div - MPTR
         # Update ID to file ID
+        """
         mptr_element = div_element.find('{%s}mptr' % namespaces[''])
         if mptr_element is not None:
             if mptr_element.get('FILEID') in id_updates:
                 mptr_element.set('FILEID', id_updates[mptr_element.get('FILEID')])
             else:
                 fptr_element.set('FILEID', new_uuid())
+        """
+        for mptr_element in div_element.findall('{%s}mptr' % namespaces['']):
+            if mptr_element.get('FILEID') in id_updates:
+                mptr_element.set('FILEID', id_updates[mptr_element.get('FILEID')])
+            else:
+                mptr_element.set('FILEID', new_uuid())
 
     for div in marked_for_remove:
         root_div_element.remove(div)
@@ -210,8 +224,11 @@ def update_mets(mets_path:Path):
                 'ID': new_uuid(),
                 'LABEL': str(rep_path.relative_to(rep_path.parents[1]))
             })
-            ET.SubElement(new_div, '{%s}fptr' % namespaces[''], attrib={
-                'FILEID': new_file_id
+            ET.SubElement(new_div, '{%s}mptr' % namespaces[''], attrib={
+                '{%s}type' % namespaces['xlink']: 'simple',
+                '{%s}href' % namespaces['xlink']: str(rep_mets_path.relative_to(rep_path)),
+                '{%s}title' % namespaces['xlink']: new_fileGrp_id,
+                '{%s}LOCTYPE' % namespaces['']: 'URL',
             })
 
     ET.indent(tree, space='    ', level=0)
