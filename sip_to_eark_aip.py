@@ -306,7 +306,7 @@ def transform_sip_to_aip(sip_path:Path, output_path:Path) -> str:
     aip_name = new_uuid()
 
     # For Testing
-    aip_name = sip_name
+    # aip_name = sip_name
 
     aip_path = (output_path / aip_name)
 
