@@ -62,8 +62,11 @@ def update_root_mets(rep_path:Path):
         'ID': new_uuid(),
         'LABEL': str(rep_path.relative_to(root_path))
     })
-    ET.SubElement(div_element, '{%s}fptr' % namespaces[''], attrib={
-        'FILEID': file_id
+    ET.SubElement(div_element, '{%s}mptr' % namespaces[''], attrib={
+        '{%s}type' % namespaces['xlink']: 'simple',
+        '{%s}href' % namespaces['xlink']: str(rep_mets_path.relative_to(root_path)),
+        '{%s}title' % namespaces['xlink']: fileGrp_id,
+        '{%s}LOCTYPE' % namespaces['']: 'URL',
     })
 
     ET.indent(tree, space='    ', level=0)
@@ -171,7 +174,7 @@ def validate_input_directory(rep_path:Path):
     # Rep must contain data directory
     data_path = (rep_path / 'data')
     if not data_path.is_dir():
-        fatal_error("SIP doesn't contain data directory")
+        fatal_error("Rep doesn't contain data directory")
 
     # Ensure data directory contains a single file with .zip extension
     preservation_files = [Path(f) for f in data_path.iterdir()]
@@ -193,6 +196,8 @@ def main(argv):
     
     rep_path = validate_input_directory(Path(argv[0]))
     create_preservation_mets(rep_path)
+
+    update_root_mets(rep_path)
 
 
 if __name__ == '__main__':
