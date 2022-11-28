@@ -206,9 +206,13 @@ def update_mets(mets_path:Path):
                 'USE': str(rep_path.relative_to(mets_path.parent))
             })
             new_file_id = new_uuid('ID')
+            new_file_mimetype = str(mimetypes.guess_type(rep_mets_path)[0])
+            # Fix potential depreciated mimetype
+            if new_file_mimetype == "application/x-zip-compressed": 
+                new_file_mimetype = "application/zip"
             new_file_element = ET.SubElement(new_fileGrp_element, '{%s}file' % namespaces[''], attrib={
                 'ID': new_file_id,
-                'MIMETYPE': str(mimetypes.guess_type(rep_mets_path)[0]),
+                'MIMETYPE': new_file_mimetype,
                 'SIZE': str(rep_mets_path.stat().st_size),
                 'CREATED': date_time_now(),
                 'CHECKSUM': get_checksum(rep_mets_path),

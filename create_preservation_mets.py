@@ -38,9 +38,12 @@ def update_root_mets(rep_path:Path):
         'USE': str(rep_path.relative_to(root_path))
     })
     file_id = new_uuid('ID')
+    # Fix potential depreciated mimetype
+    if file_mimetype == "application/x-zip-compressed": 
+        file_mimetype = "application/zip"
     file_element = ET.SubElement(fileGrp_element, '{%s}file' % namespaces[''], attrib={
         'ID': file_id,
-        'MIMETYPE': str(mimetypes.guess_type(rep_mets_path)[0]),
+        'MIMETYPE': file_mimetype,
         'SIZE': str(rep_mets_path.stat().st_size),
         'CREATED': date_time_now(),
         'CHECKSUM': get_checksum(rep_mets_path),
@@ -117,9 +120,13 @@ def create_preservation_mets(rep_path:Path):
         'USE': 'data'
     })
     file_id = new_uuid('ID')
+    # Fix potential depreciated mimetype
+    file_mimetype = str(mimetypes.guess_type(preservation_file_path)[0])
+    if file_mimetype == "application/x-zip-compressed": 
+        file_mimetype = "application/zip"
     file_element = ET.SubElement(fileGrp_element, '{%s}file' % namespaces[''], attrib={
         'ID': file_id,
-        'MIMETYPE': str(mimetypes.guess_type(preservation_file_path)[0]),
+        'MIMETYPE': file_mimetype,
         'SIZE': str(preservation_file_path.stat().st_size),
         'CREATED': date_time_now(),
         'CHECKSUM': get_checksum(preservation_file_path),
