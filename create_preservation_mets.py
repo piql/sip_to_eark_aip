@@ -10,15 +10,8 @@ from sip_to_eark_aip import extract_namespaces, get_checksum, new_uuid, date_tim
 def update_root_mets(rep_path:Path):
     root_path = rep_path.parents[1]
     root_mets = (root_path / 'METS.xml')
-<<<<<<< Updated upstream
-
     if not root_mets.exists() or not root_mets.is_file():
         fatal_error("Root METS.xml file not found")
-
-=======
-    if not root_mets.exists() or not root_mets.is_file():
-        fatal_error("Root METS.xml file not found")
->>>>>>> Stashed changes
     namespaces = extract_namespaces(root_mets)
     tree = ET.parse(root_mets)
     mets_element = tree.getroot()
@@ -44,10 +37,7 @@ def update_root_mets(rep_path:Path):
     })
     file_id = new_uuid('ID')
     # Fix potential depreciated mimetype
-<<<<<<< Updated upstream
-=======
     file_mimetype = str(mimetypes.guess_type(rep_mets_path)[0])
->>>>>>> Stashed changes
     if file_mimetype == "application/x-zip-compressed": 
         file_mimetype = "application/zip"
     file_element = ET.SubElement(fileGrp_element, '{%s}file' % namespaces[''], attrib={
@@ -80,10 +70,6 @@ def update_root_mets(rep_path:Path):
         '{%s}title' % namespaces['xlink']: fileGrp_id,
         '{%s}LOCTYPE' % namespaces['']: 'URL',
     })
-<<<<<<< Updated upstream
-
-=======
->>>>>>> Stashed changes
     ET.indent(tree, space='    ', level=0)
     tree.write(root_mets, encoding='utf-8', xml_declaration=True)
 
@@ -214,13 +200,8 @@ def main(argv):
         sys.exit("Command should have the form:\npython create_preservation_mets.py <Rep Directory>")
     
     rep_path = validate_input_directory(Path(argv[0]))
-<<<<<<< Updated upstream
-    create_preservation_mets(rep_path)
-
-=======
     logging.info(rep_path)
     create_preservation_mets(rep_path)
->>>>>>> Stashed changes
     update_root_mets(rep_path)
 
 
