@@ -3,6 +3,9 @@ import xml.etree.ElementTree as ET
 import logging
 import sys
 from pathlib import Path
+from pyunpack import Archive
+#import os
+import shutil
 
 from sip_to_eark_aip import extract_namespaces, get_checksum, new_uuid, date_time_now
 
@@ -167,6 +170,21 @@ def fatal_error(error:str):
     sys.exit('Fatal Error: '+ error)
 
 
+def convert_7z_to_zip(file_path: Path):
+    # Get the path and filename of the input 7z file
+    
+    unarchived_dir = (file_path.parent / file_path.stem)
+    unarchived_dir.mkdir()
+    
+    Archive(file_path).extractall(unarchived_dir)
+    
+    shutil.make_archive(unarchived_dir, 'zip', unarchived_dir)
+    
+    # Remove the extracted folder and original 7z
+    shutil.rmtree(unarchived_dir)
+    file_path.unlink()
+        
+
 def validate_input_directory(rep_path:Path):
     # Rep must exists
     if not rep_path.exists():
@@ -185,6 +203,15 @@ def validate_input_directory(rep_path:Path):
     preservation_files = [Path(f) for f in data_path.iterdir()]
     if len(preservation_files) != 1:
         fatal_error('Preservation representaion data directory should contain a single zip file')
+    
+    # Convert 7z to zip
+    if preservation_files[0].suffix == '.7z':
+        logging.info("7zip")
+        convert_7z_to_zip(preservation_files[0])
+        
+    if len(preservation_files) != 1:
+        fatal_error('Preservation representaion data directory should contain a single zip file - error in 7z zip conversion')
+        
     if [Path(f) for f in (rep_path / 'data').iterdir()][0].suffix != '.zip':
         fatal_error('Preservation file should be a zip')
     
