@@ -1,4 +1,4 @@
-# Penwern SIP to E-Ark AIP Generator
+# SIP to E-Ark AIP Generator
 
 The aim of this project is to generate E-Ark conformant AIPs from SIPs.
 
